@@ -31,6 +31,8 @@ if (NOT PROJECT_IS_TOP_LEVEL)
     return()
 endif ()
 
+sl_compiler_warnings(${PROJECT_NAME} WARNINGS_AS_ERRORS)
+
 include(CTest)
 if (BUILD_TESTING)
     add_subdirectory(test)
