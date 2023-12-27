@@ -7,11 +7,10 @@ cpmaddpackage(
         NAME serious-graphics-library
         GIT_REPOSITORY "git@github.com:UsatiyNyan/serious-graphics-library.git"
         GIT_TAG main)
-# TODO
-#cpmaddpackage(
-#        NAME serious-calc-library
-#        GIT_REPOSITORY "git@github.com:UsatiyNyan/serious-calc-library.git"
-#        GIT_TAG main)
+cpmaddpackage(
+        NAME serious-calculation-library
+        GIT_REPOSITORY "git@github.com:UsatiyNyan/serious-calculation-library.git"
+        GIT_TAG main)
 # TODO
 #cpmaddpackage(
 #        NAME serious-concurrency-library
@@ -38,6 +37,7 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/tl.cmake")
 add_subdirectory(miniaudio)
 
 sl_target_link_system_libraries(${PROJECT_NAME}
+        INTERFACE
         # fp components
         serious-meta-library
 

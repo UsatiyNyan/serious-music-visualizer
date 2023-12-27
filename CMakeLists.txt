@@ -21,7 +21,10 @@ project(
         HOMEPAGE_URL "TODO"
         LANGUAGES C CXX)
 
-add_executable(${PROJECT_NAME} src/main.cpp)
+add_library(${PROJECT_NAME} INTERFACE)
+
+add_executable(${PROJECT_NAME}-app src/main.cpp)
+target_link_libraries(${PROJECT_NAME}-app PRIVATE ${PROJECT_NAME})
 
 add_subdirectory(dependencies)
 
@@ -37,3 +40,5 @@ include(CTest)
 if (BUILD_TESTING)
     add_subdirectory(test)
 endif ()
+
+add_subdirectory(examples)
