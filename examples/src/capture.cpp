@@ -1,8 +1,6 @@
 //
 // Created by usatiynyan on 12/27/23.
 //
-// TODO(@usatiynyan): fft transform -> visualize
-//
 
 #include "miniaudio/miniaudio.hpp"
 
@@ -15,7 +13,7 @@
 
 int main() {
     const ma_context_config context_config = ma_context_config_init();
-    const auto context = ASSERT(ma::context_init({}, context_config));
+    const auto context = *ASSERT(ma::context_init({}, context_config));
     fmt::println("context backend: {}", ma_get_backend_name(context->backend));
 
     constexpr auto data_callback =
@@ -46,12 +44,11 @@ int main() {
     device_config.dataCallback = data_callback;
     device_config.pUserData = highest_amplitude.get();
 
-    const auto device = ASSERT(ma::device_init(context, device_config));
+    const auto device = *ASSERT(ma::device_init(context, device_config));
     fmt::println("Device Name: {}", device->playback.name);
 
     ASSERT(ma::device_start(device));
 
-    fmt::println("Press Enter to quit...");
     while (true) {
         std::this_thread::sleep_for(std::chrono::milliseconds{ 33 });
         const float curr_highest_amplitude = highest_amplitude->load(std::memory_order::acquire);

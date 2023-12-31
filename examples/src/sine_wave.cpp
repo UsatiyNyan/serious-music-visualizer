@@ -1,8 +1,6 @@
 //
 // Created by usatiynyan on 12/26/23.
 //
-// TODO(@usatiynyan): fft transform -> visualize
-//
 
 #include "miniaudio/miniaudio.hpp"
 
@@ -11,7 +9,7 @@
 
 int main() {
     const ma_context_config context_config = ma_context_config_init();
-    const auto context = ASSERT(ma::context_init({}, context_config));
+    const auto context = *ASSERT(ma::context_init({}, context_config));
 
     constexpr auto data_callback =
         [](ma_device* device, void* output, [[maybe_unused]] const void* input, ma_uint32 frame_count) {
@@ -30,7 +28,7 @@ int main() {
     device_config.dataCallback = data_callback;
     device_config.pUserData = sine_wave.get();
 
-    const auto device = ASSERT(ma::device_init(context, device_config));
+    const auto device = *ASSERT(ma::device_init(context, device_config));
     fmt::println("device name: {}", device->playback.name);
 
     ma_waveform_config sineWaveConfig = ma_waveform_config_init(

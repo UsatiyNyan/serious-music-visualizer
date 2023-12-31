@@ -9,29 +9,42 @@
 
 namespace ma {
 
-context_uptr context_init(std::vector<ma_backend> backends, const ma_context_config& context_config) {
+std::string_view result_description(ma_result result) {
+    return ma_result_description(result);
+}
+
+// ew macros, oh well...
+#define MA_UNEXPECTED(x)                                    \
+    do {                                                    \
+        if (ma_result result = (x); result != MA_SUCCESS) { \
+            return tl::make_unexpected(result);             \
+        }                                                   \
+    } while (false)
+
+tl::expected<context_uptr, ma_result>
+    context_init(std::vector<ma_backend> backends, const ma_context_config& context_config) {
     context_uptr context{ new ma_context, &ma_context_uninit };
     const auto* backends_ptr = backends.empty() ? nullptr : backends.data();
-    if (ma_context_init(backends_ptr, backends.size(), &context_config, context.get()) != MA_SUCCESS) {
-        context.reset();
-    }
+    MA_UNEXPECTED(ma_context_init(backends_ptr, backends.size(), &context_config, context.get()));
     return context;
 }
 
-device_uptr device_init(const context_uptr& context, const ma_device_config& device_config) {
+tl::expected<device_uptr, ma_result> device_init(const context_uptr& context, const ma_device_config& device_config) {
     device_uptr device{ new ma_device, &ma_device_uninit };
-    if (ma_device_init(context.get(), &device_config, device.get()) != MA_SUCCESS) {
-        device.reset();
-    }
+    MA_UNEXPECTED(ma_device_init(context.get(), &device_config, device.get()));
     return device;
 }
 
-tl::optional<tl::monostate> device_start(const device_uptr& device) {
-    return ma_device_start(device.get()) == MA_SUCCESS ? tl::optional{ tl::monostate{} } : tl::nullopt;
+tl::expected<tl::monostate, ma_result> device_start(const device_uptr& device) {
+    MA_UNEXPECTED(ma_device_start(device.get()));
+    return tl::monostate{};
 }
 
-tl::optional<tl::monostate> device_stop(const device_uptr& device) {
-    return ma_device_stop(device.get()) == MA_SUCCESS ? tl::optional{ tl::monostate{} } : tl::nullopt;
+tl::expected<tl::monostate, ma_result> device_stop(const device_uptr& device) {
+    MA_UNEXPECTED(ma_device_stop(device.get()));
+    return tl::monostate{};
 }
+
+#undef MA_UNEXPECTED
 
 } // namespace ma

@@ -12,5 +12,5 @@ target_include_directories(miniaudio
 )
 sl_target_link_system_libraries(miniaudio
         PUBLIC
-        tl::optional
+        tl::expected
 )
