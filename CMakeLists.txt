@@ -21,7 +21,9 @@ project(
         HOMEPAGE_URL "TODO"
         LANGUAGES C CXX)
 
-add_library(${PROJECT_NAME} INTERFACE)
+add_library(${PROJECT_NAME} STATIC
+        src/audio.cpp)
+target_include_directories(${PROJECT_NAME} PUBLIC include)
 
 add_executable(${PROJECT_NAME}-app src/main.cpp)
 target_link_libraries(${PROJECT_NAME}-app PRIVATE ${PROJECT_NAME})

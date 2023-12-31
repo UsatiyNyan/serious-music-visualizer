@@ -42,7 +42,7 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/tl.cmake")
 add_subdirectory(miniaudio)
 
 sl_target_link_system_libraries(${PROJECT_NAME}
-        INTERFACE
+        PUBLIC
         # fp components
         serious-meta-library
         range-v3::range-v3

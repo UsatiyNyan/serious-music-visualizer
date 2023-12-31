@@ -72,7 +72,7 @@ int main() {
     device_config.pUserData = highest_amplitude.get();
 
     const auto device = *ASSERT(ma::device_init(context, device_config).map_error(log_error));
-    fmt::println("Device Name: {}", device->playback.name);
+    fmt::println("Device Name: {}", device->capture.name);
 
     ASSERT(ma::device_start(device).map_error(log_error));
 
