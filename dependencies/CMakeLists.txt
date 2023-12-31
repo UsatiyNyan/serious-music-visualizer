@@ -65,6 +65,9 @@ sl_target_link_system_libraries(${PROJECT_NAME}
         # graphics
         serious-graphics-library
 
+        # fft
+        serious-calculation-library
+
         # concurrency
         SPSCQueue::SPSCQueue
 )
