@@ -16,6 +16,11 @@ cpmaddpackage(
 #        NAME serious-concurrency-library
 #        GIT_REPOSITORY "git@github.com:UsatiyNyan/serious-concurrency-library.git"
 #        GIT_TAG main)
+# Oh well...
+cpmaddpackage(
+        NAME SPSCQueue
+        GIT_REPOSITORY "git@github.com:rigtorp/SPSCQueue.git"
+        GIT_TAG v1.1)
 
 cpmaddpackage(
         NAME fmt
@@ -59,4 +64,7 @@ sl_target_link_system_libraries(${PROJECT_NAME}
 
         # graphics
         serious-graphics-library
+
+        # concurrency
+        SPSCQueue::SPSCQueue
 )
