@@ -6,11 +6,15 @@
 
 #include "sl/calc/fourier.hpp"
 
-#include <assert.hpp>
-#include <fmt/format.h>
-#include <range/v3/view/enumerate.hpp>
 #include <rigtorp/SPSCQueue.h>
 
+#include <range/v3/to_container.hpp>
+#include <range/v3/view/enumerate.hpp>
+#include <range/v3/view/stride.hpp>
+#include <range/v3/view/take.hpp>
+
+#include <assert.hpp>
+#include <fmt/format.h>
 #include <iostream>
 
 struct AudioCallback {
@@ -23,9 +27,11 @@ struct AudioCallback {
 
 
 int main() {
+    namespace views = ranges::views;
+
     const sa::AudioContext audio_context;
 
-    for (const auto& [i, capture_info] : ranges::views::enumerate(audio_context.capture_infos())) {
+    for (const auto& [i, capture_info] : views::enumerate(audio_context.capture_infos())) {
         fmt::println("capture[{}]={} ", i, capture_info.name);
     }
 
@@ -58,35 +64,16 @@ int main() {
         while (audio_data.size() >= audio_data_size) {
             // capture.channels=2
             // take only 0th channel, which is left for stereo, for now
-            const auto time_domain_input = [&audio_data, capture_channels] {
-                std::vector<std::complex<float>> time_domain_input_(audio_data_frame_count);
-                for (std::size_t i = 0; i < audio_data_frame_count; ++i) {
-                    time_domain_input_[i] = audio_data[i * capture_channels];
-                }
-                return time_domain_input_;
-            }();
-
+            const auto time_domain_input = audio_data //
+                                           | views::stride(capture_channels) //
+                                           | views::take(audio_data_frame_count) //
+                                           | ranges::to<std::vector<std::complex<float>>>();
             audio_data.erase(audio_data.begin(), audio_data.begin() + static_cast<std::int64_t>(audio_data_size));
 
             const auto freq_domain_output =
                 sl::calc::fft<sl::calc::fourier::direction::time_to_freq>(std::span{ time_domain_input });
 
-            const auto max_amplitude_it = std::max_element(
-                freq_domain_output.begin(),
-                freq_domain_output.end(),
-                [](const std::complex<float> l, const std::complex<float> r) { return std::abs(l) < std::abs(r); }
-            );
-            if (max_amplitude_it == freq_domain_output.end()) {
-                continue;
-            }
-
-            fmt::print("{:<8}", audio_data.size());
-
-            const auto stars_count = static_cast<std::size_t>(std::abs(*max_amplitude_it));
-            for (std::size_t i = 0; i < stars_count; ++i) {
-                fmt::print("*");
-            }
-            fmt::println("|");
+            // TODO: draw time_domain_input and freq_domain_output
         }
     }
 
