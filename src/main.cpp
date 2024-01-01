@@ -16,11 +16,7 @@
 struct AudioCallback {
     rigtorp::SPSCQueue<std::vector<float>> data_queue{ 1 };
 
-    void operator()(
-        [[maybe_unused]] const ma_device& device,
-        std::span<const float> input,
-        [[maybe_unused]] ma_uint32 frame_count
-    ) {
+    void operator()(std::span<const float> input) {
         [[maybe_unused]] const bool pushed = data_queue.try_emplace(input.begin(), input.end());
     }
 };

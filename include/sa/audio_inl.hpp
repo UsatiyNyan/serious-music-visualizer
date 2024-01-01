@@ -13,9 +13,7 @@ tl::expected<ma::device_uptr, ma_result>
         [](ma_device* device, void* output, [[maybe_unused]] const void* input, ma_uint32 frame_count) {
             validate(device);
             (*static_cast<Callable*>(device->pUserData)) //
-                (std::cref(*device),
-                 std::span{ static_cast<float*>(output), frame_count * device->playback.channels },
-                 frame_count);
+                (std::span{ static_cast<float*>(output), frame_count * device->playback.channels });
         };
 
     return create_device(ma_device_type_playback, playback_index, 0, data_callback, callable.get());
@@ -28,9 +26,7 @@ tl::expected<ma::device_uptr, ma_result>
         [](ma_device* device, [[maybe_unused]] void* output, const void* input, ma_uint32 frame_count) {
             validate(device);
             (*static_cast<Callable*>(device->pUserData)) //
-                (std::cref(*device),
-                 std::span{ static_cast<const float*>(input), frame_count * device->capture.channels },
-                 frame_count);
+                (std::span{ static_cast<const float*>(input), frame_count * device->capture.channels });
         };
 
     return create_device(ma_device_type_capture, 0, capture_index, data_callback, callable.get());
@@ -45,10 +41,8 @@ tl::expected<ma::device_uptr, ma_result> AudioContext::create_duplex_device(
     constexpr auto data_callback = [](ma_device* device, void* output, const void* input, ma_uint32 frame_count) {
         validate(device);
         (*static_cast<Callable*>(device->pUserData)) //
-            (std::cref(*device),
-             std::span{ static_cast<float*>(output), frame_count * device->playback.channels },
-             std::span{ static_cast<const float*>(input), frame_count * device->capture.channels },
-             frame_count);
+            (std::span{ static_cast<float*>(output), frame_count * device->playback.channels },
+             std::span{ static_cast<const float*>(input), frame_count * device->capture.channels });
     };
 
     return create_device(ma_device_type_duplex, playback_index, capture_index, data_callback, callable.get());
@@ -61,9 +55,7 @@ tl::expected<ma::device_uptr, ma_result>
         [](ma_device* device, [[maybe_unused]] void* output, const void* input, ma_uint32 frame_count) {
             validate(device);
             (*static_cast<Callable*>(device->pUserData)) //
-                (std::cref(*device),
-                 std::span{ static_cast<const float*>(input), frame_count * device->capture.channels },
-                 frame_count);
+                (std::span{ static_cast<const float*>(input), frame_count * device->capture.channels });
         };
 
     return create_device(ma_device_type_loopback, 0, capture_index, data_callback, callable.get());
