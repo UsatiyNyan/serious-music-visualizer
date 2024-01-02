@@ -6,6 +6,8 @@
 
 #include <miniaudio/miniaudio.hpp>
 
+#include <sl/meta/lifetime/defer.hpp>
+
 #include <tl/expected.hpp>
 
 #include <memory>
@@ -14,6 +16,13 @@
 #include <tuple>
 
 namespace sa {
+
+tl::expected<sl::defer, ma_result> make_running_device_guard(const ma::device_uptr& device);
+
+struct AudioDeviceConfig {
+    std::size_t index;
+    ma_uint32 channels;
+};
 
 class AudioContext {
 public:
@@ -28,33 +37,31 @@ public:
 
     template <typename Callable>
     [[nodiscard]] tl::expected<ma::device_uptr, ma_result>
-        create_playback_device(std::size_t playback_index, const std::unique_ptr<Callable>& callable) const;
+        create_playback_device(AudioDeviceConfig playback_config, const std::unique_ptr<Callable>& callable) const;
 
     template <typename Callable>
     [[nodiscard]] tl::expected<ma::device_uptr, ma_result>
-        create_capture_device(std::size_t capture_index, const std::unique_ptr<Callable>& callable) const;
+        create_capture_device(AudioDeviceConfig capture_config, const std::unique_ptr<Callable>& callable) const;
 
     template <typename Callable>
     [[nodiscard]] tl::expected<ma::device_uptr, ma_result> create_duplex_device(
-        std::size_t playback_index,
-        std::size_t capture_index,
+        AudioDeviceConfig playback_config,
+        AudioDeviceConfig capture_config,
         const std::unique_ptr<Callable>& callable
     ) const;
 
     template <typename Callable>
     [[nodiscard]] tl::expected<ma::device_uptr, ma_result>
-        create_loopback_device(std::size_t capture_index, const std::unique_ptr<Callable>& callable) const;
+        create_loopback_device(AudioDeviceConfig capture_config, const std::unique_ptr<Callable>& callable) const;
 
 private:
     [[nodiscard]] tl::expected<ma::device_uptr, ma_result> create_device(
         ma_device_type device_type,
-        std::size_t playback_index,
-        std::size_t capture_index,
+        AudioDeviceConfig playback_config,
+        AudioDeviceConfig capture_config,
         ma_device_data_proc data_callback,
         void* user_data
     ) const;
-
-    static void validate(const ma_device* device);
 
 private:
     ma::context_uptr context_;
@@ -62,6 +69,6 @@ private:
     std::span<ma_device_info> capture_infos_;
 };
 
-} // namespace sm
+} // namespace sa
 
 #include "audio_inl.hpp"

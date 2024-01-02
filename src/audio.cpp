@@ -11,16 +11,21 @@ namespace sa {
 
 namespace {
 
+constexpr ma_format format = ma_format_f32;
+constexpr ma_uint32 device_sample_rate = 48000;
+
 ma_result log_error(ma_result result) {
     spdlog::error(ma::result_description(result));
     return result;
 }
 
-constexpr ma_format format = ma_format_f32;
-constexpr ma_uint32 device_channels = 2;
-constexpr ma_uint32 device_sample_rate = 48000;
-
 } // namespace
+
+tl::expected<sl::defer, ma_result> make_running_device_guard(const ma::device_uptr& device) {
+    return ma::device_start(device).map([&](tl::monostate) {
+        return sl::defer{ [&] { ASSERT(ma::device_stop(device).map_error(log_error)); } };
+    });
+}
 
 AudioContext::AudioContext(const std::vector<ma_backend>& backends, const ma_context_config& context_config)
     : context_{ *ASSERT(ma::context_init(backends, context_config).map_error(log_error)) } {
@@ -37,23 +42,23 @@ std::span<ma_device_info> AudioContext::capture_infos() const { return capture_i
 
 tl::expected<ma::device_uptr, ma_result> AudioContext::create_device(
     ma_device_type device_type,
-    std::size_t playback_index,
-    std::size_t capture_index,
+    AudioDeviceConfig playback_config,
+    AudioDeviceConfig capture_config,
     ma_device_data_proc data_callback,
     void* user_data
 ) const {
     ma_device_config device_config = ma_device_config_init(device_type);
     if (device_type & ma_device_type::ma_device_type_playback) {
-        ASSERT(playback_index < playback_infos_.size());
+        ASSERT(playback_config.index < playback_infos_.size());
         device_config.playback.format = format;
-        device_config.playback.channels = device_channels;
-        device_config.playback.pDeviceID = &playback_infos_[playback_index].id;
+        device_config.playback.channels = playback_config.channels;
+        device_config.playback.pDeviceID = &playback_infos_[playback_config.index].id;
     }
     if (device_type & ma_device_type::ma_device_type_capture || device_type == ma_device_type_loopback) {
-        ASSERT(capture_index < capture_infos_.size());
+        ASSERT(capture_config.index < capture_infos_.size());
         device_config.capture.format = format;
-        device_config.capture.channels = device_channels;
-        device_config.capture.pDeviceID = &capture_infos_[capture_index].id;
+        device_config.capture.channels = capture_config.channels;
+        device_config.capture.pDeviceID = &capture_infos_[capture_config.index].id;
     }
 
     device_config.sampleRate = device_sample_rate;
@@ -63,15 +68,4 @@ tl::expected<ma::device_uptr, ma_result> AudioContext::create_device(
     return ma::device_init(context_, device_config).map_error(log_error);
 }
 
-void AudioContext::validate(const ma_device* device) {
-    if (device->type & ma_device_type::ma_device_type_playback) {
-        ASSERT(device->playback.format == format);
-        ASSERT(device->playback.channels == device_channels);
-    }
-    if (device->type & ma_device_type::ma_device_type_capture || device->type == ma_device_type_loopback) {
-        ASSERT(device->capture.format == format);
-        ASSERT(device->capture.channels == device_channels);
-    }
-}
-
-} // namespace sm
+} // namespace sa
