@@ -8,23 +8,28 @@
 
 #include <rigtorp/SPSCQueue.h>
 
-#include <range/v3/to_container.hpp>
 #include <range/v3/view/enumerate.hpp>
 #include <range/v3/view/stride.hpp>
 #include <range/v3/view/take.hpp>
 
+#include <tl/optional.hpp>
+
 #include <assert.hpp>
 #include <fmt/format.h>
-#include <iostream>
 
-namespace views = ranges::views;
-
-struct AudioCallback {
-    rigtorp::SPSCQueue<std::vector<float>> data_queue{ 1 };
+struct AudioDataCallback {
+    rigtorp::SPSCQueue<std::vector<float>> data_queue;
 
     void operator()(std::span<const float> input) {
         [[maybe_unused]] const bool pushed = data_queue.try_emplace(input.begin(), input.end());
     }
+};
+
+struct AudioCaptureState {
+    ma_device_type device_type;
+    std::size_t index;
+
+    bool operator<=>(const AudioCaptureState& other) const = default;
 };
 
 void draw_complex_data(
@@ -100,64 +105,108 @@ std::vector<std::complex<float>> interpolate_log_domain(const std::vector<std::c
 int main() {
     const sl::gfx::Context::Options ctx_options{ 4, 6, GLFW_OPENGL_CORE_PROFILE };
     auto ctx = *ASSERT(sl::gfx::Context::create(ctx_options));
-    const sl::gfx::Size2I window_size{ 800, 600 };
+    const sl::gfx::Size2I window_size{ 1280, 720 };
     const auto window = ASSERT(sl::gfx::Window::create(ctx, "serious music visualizer", window_size));
     window->FramebufferSize_cb = [&window](GLsizei width, GLsizei height) {
         sl::gfx::Window::Current{ *window }.viewport(sl::gfx::Vec2I{}, sl::gfx::Size2I{ width, height });
     };
     auto current_window =
-        window->make_current(sl::gfx::Vec2I{}, window_size, sl::gfx::Color4F{ 0.2f, 0.3f, 0.3f, 1.0f });
+        window->make_current(sl::gfx::Vec2I{}, window_size, sl::gfx::Color4F{ 0.0f, 0.0f, 0.0f, 1.0f });
     sl::gfx::ImGuiContext imgui_context{ ctx_options, *window };
 
     const sa::AudioContext audio_context;
-    for (const auto& [i, capture_info] : views::enumerate(audio_context.capture_infos())) {
-        fmt::println("capture[{}]={} ", i, capture_info.name);
-    }
-    const std::size_t capture_index = [] {
-        fmt::print("choose capture index: ");
-        std::size_t capture_index_ = 0;
-        std::cin >> capture_index_;
-        return capture_index_;
-    }();
+    tl::expected<ma::device_uptr, ma_result> audio_device = tl::make_unexpected(MA_SUCCESS);
+    tl::expected<sl::defer, ma_result> running_audio_device = tl::make_unexpected(MA_SUCCESS);
 
-    const auto audio_callback = std::make_unique<AudioCallback>();
-    const auto capture_device = *ASSERT(audio_context.create_capture_device(capture_index, audio_callback));
-    const std::size_t capture_channels = capture_device->capture.channels;
+    constexpr std::size_t audio_data_queue_capacity = 1;
+    const std::unique_ptr<AudioDataCallback> audio_data_callback{ new AudioDataCallback{
+        .data_queue = rigtorp::SPSCQueue<std::vector<float>>{ audio_data_queue_capacity },
+    } };
 
+    constexpr ma_uint32 audio_capture_channels = 2;
     constexpr std::size_t audio_data_frame_count = 1024;
-    const std::size_t audio_data_size = audio_data_frame_count * capture_channels;
+    constexpr std::size_t max_audio_data_coef = 16;
     std::vector<float> audio_data;
-    audio_data.reserve(audio_data_size);
+    audio_data.reserve(audio_capture_channels * audio_data_frame_count);
+    std::vector<std::complex<float>> time_domain_input(audio_data_frame_count);
 
-    ASSERT(ma::device_start(capture_device));
+    tl::optional<AudioCaptureState> audio_capture_state;
 
     while (!current_window.should_close()) {
         if (current_window.is_key_pressed(GLFW_KEY_ESCAPE)) {
             current_window.set_should_close(true);
         }
-        const auto* audio_data_ptr = audio_callback->data_queue.front();
-        if (audio_data_ptr == nullptr) {
-            continue;
-        }
-        audio_data.insert(audio_data.end(), audio_data_ptr->begin(), audio_data_ptr->end());
-        audio_callback->data_queue.pop();
+        current_window.clear(GL_COLOR_BUFFER_BIT);
+        imgui_context.new_frame();
 
-        while (audio_data.size() >= audio_data_size) {
+        // INITIALIZE DEVICE
+        // TODO: get device_type and capture_index from imgui
+        AudioCaptureState new_audio_capture_state{
+            .device_type = ma_device_type_capture,
+            .index = 1,
+        };
+
+        if (audio_capture_state != new_audio_capture_state) {
+            audio_capture_state = new_audio_capture_state;
+
+            // TODO: show capture devices indices on separate window
+            for (const auto& [i, capture_info] : ranges::views::enumerate(audio_context.capture_infos())) {
+                fmt::println("capture[{}]={} ", i, capture_info.name);
+            }
+
+            // stop device if it is running
+            running_audio_device = tl::make_unexpected(MA_SUCCESS);
+
+            switch (audio_capture_state->device_type) {
+            case ma_device_type_capture:
+                audio_device = audio_context.create_capture_device(
+                    { .index = audio_capture_state->index, .channels = audio_capture_channels }, audio_data_callback
+                );
+                break;
+            case ma_device_type_loopback:
+                audio_device = audio_context.create_loopback_device(
+                    { .index = audio_capture_state->index, .channels = audio_capture_channels }, audio_data_callback
+                );
+                break;
+            default:
+                audio_device = tl::make_unexpected(MA_DEVICE_TYPE_NOT_SUPPORTED);
+                break;
+            }
+
+            running_audio_device = audio_device.and_then(sa::make_running_device_guard);
+        }
+
+        // FETCH AUDIO DATA
+        if (const auto* audio_data_ptr = audio_data_callback->data_queue.front();
+            audio_data_ptr != nullptr
+            && audio_data.size() < max_audio_data_coef * audio_capture_channels * audio_data_frame_count) {
+            audio_data.insert(audio_data.end(), audio_data_ptr->begin(), audio_data_ptr->end());
+            audio_data_callback->data_queue.pop();
+        }
+
+        // FILL AUDIO DATA
+        if (audio_data.size() >= audio_capture_channels * audio_data_frame_count) {
             // capture.channels=2
             // take only 0th channel, which is left for stereo, for now
-            const auto time_domain_input = audio_data //
-                                           | views::stride(capture_channels) //
-                                           | views::take(audio_data_frame_count) //
-                                           | ranges::to<std::vector<std::complex<float>>>();
-            audio_data.erase(audio_data.begin(), audio_data.begin() + static_cast<std::int64_t>(audio_data_size));
+            const auto time_domain_input_range = audio_data //
+                                                 | ranges::views::stride(audio_capture_channels) //
+                                                 | ranges::views::take(audio_data_frame_count);
+            time_domain_input.assign(time_domain_input_range.begin(), time_domain_input_range.end());
+
+            audio_data.erase(
+                audio_data.begin(),
+                audio_data.begin() + static_cast<std::int64_t>(audio_capture_channels * audio_data_frame_count)
+            );
+        }
+
+        // VISUALIZE AUDIO DATA
+        {
+            ImGui::Begin("debug data processing");
 
             const auto freq_domain_output =
-                sl::calc::fourier::fft_recursive<sl::calc::fourier::direction::time_to_freq>(std::span{
-                    time_domain_input });
-
-
-            current_window.clear(GL_COLOR_BUFFER_BIT);
-            imgui_context.new_frame();
+                sl::calc::fourier::fft_recursive<sl::calc::fourier::direction::time_to_freq>(
+                    std::span<const std::complex<float>>{ time_domain_input }
+                );
 
             draw_complex_data(
                 "time_domain",
@@ -165,7 +214,7 @@ int main() {
                     const auto* v = static_cast<const std::complex<float>*>(data);
                     return v[static_cast<std::size_t>(idx)].real();
                 },
-                std::span{ time_domain_input },
+                time_domain_input,
                 -1.0f,
                 1.0f
             );
@@ -215,10 +264,12 @@ int main() {
                 std::log(64.0f)
             );
 
-            imgui_context.render();
-            current_window.swap_buffers();
-            ctx.poll_events();
+            ImGui::End();
         }
+
+        imgui_context.render();
+        current_window.swap_buffers();
+        ctx.poll_events();
     }
 
     return 0;
