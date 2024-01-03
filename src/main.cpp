@@ -3,14 +3,18 @@
 //
 
 #include "sa/audio.hpp"
-#include "sl/calc/fourier.hpp"
-#include "sl/gfx.hpp"
+
+#include <sl/calc/fourier.hpp>
+#include <sl/gfx.hpp>
+#include <sl/meta/optional/combine.hpp>
+#include <sl/meta/tuple/construct_from_tuple.hpp>
 
 #include <rigtorp/SPSCQueue.h>
 
 #include <range/v3/view/enumerate.hpp>
 #include <range/v3/view/stride.hpp>
 #include <range/v3/view/take.hpp>
+#include <range/v3/view/transform.hpp>
 
 #include <tl/optional.hpp>
 
@@ -25,11 +29,45 @@ struct AudioDataCallback {
     }
 };
 
-struct AudioCaptureState {
+struct AudioDeviceState {
     ma_device_type device_type;
     std::size_t index;
 
-    bool operator<=>(const AudioCaptureState& other) const = default;
+    bool operator<=>(const AudioDeviceState& other) const = default;
+};
+
+struct AudioDeviceControls {
+    std::vector<std::string> audio_capture_names;
+    tl::optional<ma_device_type> device_type = ma_device_type_capture;
+    tl::optional<std::size_t> index = {};
+
+    tl::optional<AudioDeviceState> update() {
+        // TODO: get device_type from imgui
+        if (ImGui::Begin("device controls", nullptr, ImGuiWindowFlags_NoMove)) {
+            ImGui::SetWindowPos(ImVec2{ 0.0f, 0.0f });
+            ImGui::SetWindowSize(ImVec2{ 0.0f, 80.0f });
+
+            const auto preview_capture_source =
+                index //
+                    .map([this](const auto& index_) { return std::string_view{ audio_capture_names[index_] }; }) //
+                    .value_or(std::string_view{});
+
+            if (ImGui::BeginCombo("capture sources", preview_capture_source.data())) {
+                for (const auto& [i, audio_capture_name] : ranges::views::enumerate(audio_capture_names)) {
+                    if (ImGui::Selectable(audio_capture_name.c_str())) {
+                        index = i;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
+            ImGui::End();
+        }
+
+        return sl::meta::combine(device_type, index).map([](const auto& values) {
+            return sl::meta::construct_from_tuple<AudioDeviceState>(values);
+        });
+    }
 };
 
 void draw_complex_data(
@@ -115,6 +153,14 @@ int main() {
     sl::gfx::ImGuiContext imgui_context{ ctx_options, *window };
 
     const sa::AudioContext audio_context;
+    tl::optional<AudioDeviceState> audio_device_state;
+    AudioDeviceControls audio_device_controls{ .audio_capture_names = //
+                                               ranges::views::enumerate(audio_context.capture_infos())
+                                               | ranges::views::transform([](const auto& i_and_device_info) {
+                                                     const auto& [i, device_info] = i_and_device_info;
+                                                     return fmt::format("capture[{}]={} ", i, device_info.name);
+                                                 })
+                                               | ranges::to<std::vector>() };
     tl::expected<ma::device_uptr, ma_result> audio_device = tl::make_unexpected(MA_SUCCESS);
     tl::expected<sl::defer, ma_result> running_audio_device = tl::make_unexpected(MA_SUCCESS);
 
@@ -130,42 +176,41 @@ int main() {
     audio_data.reserve(audio_capture_channels * audio_data_frame_count);
     std::vector<std::complex<float>> time_domain_input(audio_data_frame_count);
 
-    tl::optional<AudioCaptureState> audio_capture_state;
-
     while (!current_window.should_close()) {
         if (current_window.is_key_pressed(GLFW_KEY_ESCAPE)) {
             current_window.set_should_close(true);
         }
         current_window.clear(GL_COLOR_BUFFER_BIT);
+
+        // DRAW LAYER
+        // VISUALIZE AUDIO DATA
+        {
+            // TODO(@usatiynyan)
+        }
+
+        // IMGUI LAYER
+        // TODO(@usatiynyan): test, check what if placed underneath draw layer
         imgui_context.new_frame();
 
+        // DEVICE CONTROLS
+        const auto new_audio_device_state = audio_device_controls.update();
+
         // INITIALIZE DEVICE
-        // TODO: get device_type and capture_index from imgui
-        AudioCaptureState new_audio_capture_state{
-            .device_type = ma_device_type_capture,
-            .index = 1,
-        };
-
-        if (audio_capture_state != new_audio_capture_state) {
-            audio_capture_state = new_audio_capture_state;
-
-            // TODO: show capture devices indices on separate window
-            for (const auto& [i, capture_info] : ranges::views::enumerate(audio_context.capture_infos())) {
-                fmt::println("capture[{}]={} ", i, capture_info.name);
-            }
+        if (new_audio_device_state && audio_device_state != new_audio_device_state) {
+            audio_device_state = new_audio_device_state;
 
             // stop device if it is running
             running_audio_device = tl::make_unexpected(MA_SUCCESS);
 
-            switch (audio_capture_state->device_type) {
+            switch (audio_device_state->device_type) {
             case ma_device_type_capture:
                 audio_device = audio_context.create_capture_device(
-                    { .index = audio_capture_state->index, .channels = audio_capture_channels }, audio_data_callback
+                    { .index = audio_device_state->index, .channels = audio_capture_channels }, audio_data_callback
                 );
                 break;
             case ma_device_type_loopback:
                 audio_device = audio_context.create_loopback_device(
-                    { .index = audio_capture_state->index, .channels = audio_capture_channels }, audio_data_callback
+                    { .index = audio_device_state->index, .channels = audio_capture_channels }, audio_data_callback
                 );
                 break;
             default:
@@ -199,10 +244,8 @@ int main() {
             );
         }
 
-        // VISUALIZE AUDIO DATA
-        {
-            ImGui::Begin("debug data processing");
-
+        // DEBUG AUDIO DATA PROCESSING
+        if (ImGui::Begin("debug audio data processing")) {
             const auto freq_domain_output =
                 sl::calc::fourier::fft_recursive<sl::calc::fourier::direction::time_to_freq>(
                     std::span<const std::complex<float>>{ time_domain_input }
