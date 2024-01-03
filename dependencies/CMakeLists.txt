@@ -51,6 +51,8 @@ sl_target_link_system_libraries(${PROJECT_NAME}
         # fp components
         serious-meta-library
         range-v3::range-v3
+        tl::optional
+        tl::expected
 
         # fmt/log
         fmt::fmt
