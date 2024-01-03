@@ -38,21 +38,48 @@ struct AudioDeviceState {
 
 struct AudioDeviceControls {
     std::vector<std::string> audio_capture_names;
-    tl::optional<ma_device_type> device_type = ma_device_type_capture;
-    tl::optional<std::size_t> index = {};
+    tl::optional<ma_device_type> device_type;
+    tl::optional<std::size_t> index;
 
     tl::optional<AudioDeviceState> update() {
-        // TODO: get device_type from imgui
+        constexpr std::array device_type_to_name_map{
+            std::pair{ ma_device_type_capture, std::string_view{ "capture" } },
+            std::pair{ ma_device_type_loopback, std::string_view{ "loopback" } },
+        };
+
         if (ImGui::Begin("device controls", nullptr, ImGuiWindowFlags_NoMove)) {
             ImGui::SetWindowPos(ImVec2{ 0.0f, 0.0f });
             ImGui::SetWindowSize(ImVec2{ 0.0f, 80.0f });
 
-            const auto preview_capture_source =
-                index //
-                    .map([this](const auto& index_) { return std::string_view{ audio_capture_names[index_] }; }) //
+            const auto preview_device_type =
+                device_type //
+                    .map([device_type_to_name_map](auto device_type_) {
+                        const auto it = std::find_if(
+                            device_type_to_name_map.begin(),
+                            device_type_to_name_map.end(),
+                            [device_type_](const auto& device_type_to_name) {
+                                return device_type_to_name.first == device_type_;
+                            }
+                        );
+                        return it == device_type_to_name_map.end() ? std::string_view{} : it->second;
+                    })
                     .value_or(std::string_view{});
 
-            if (ImGui::BeginCombo("capture sources", preview_capture_source.data())) {
+            if (ImGui::BeginCombo("device type", preview_device_type.data())) {
+                for (const auto& [a_device_type, a_device_type_name] : device_type_to_name_map) {
+                    if (ImGui::Selectable(a_device_type_name.data())) {
+                        device_type = a_device_type;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
+            const auto preview_capture_source =
+                index //
+                    .map([this](auto index_) { return std::string_view{ audio_capture_names[index_] }; }) //
+                    .value_or(std::string_view{});
+
+            if (ImGui::BeginCombo("capture source", preview_capture_source.data())) {
                 for (const auto& [i, audio_capture_name] : ranges::views::enumerate(audio_capture_names)) {
                     if (ImGui::Selectable(audio_capture_name.c_str())) {
                         index = i;
@@ -154,13 +181,14 @@ int main() {
 
     const sa::AudioContext audio_context;
     tl::optional<AudioDeviceState> audio_device_state;
-    AudioDeviceControls audio_device_controls{ .audio_capture_names = //
-                                               ranges::views::enumerate(audio_context.capture_infos())
-                                               | ranges::views::transform([](const auto& i_and_device_info) {
-                                                     const auto& [i, device_info] = i_and_device_info;
-                                                     return fmt::format("capture[{}]={} ", i, device_info.name);
-                                                 })
-                                               | ranges::to<std::vector>() };
+    AudioDeviceControls audio_device_controls{
+        .audio_capture_names = ranges::views::enumerate(audio_context.capture_infos())
+                               | ranges::views::transform([](const auto& i_and_device_info) {
+                                     const auto& [i, device_info] = i_and_device_info;
+                                     return fmt::format("capture[{}]={} ", i, device_info.name);
+                                 })
+                               | ranges::to<std::vector>(),
+    };
     tl::expected<ma::device_uptr, ma_result> audio_device = tl::make_unexpected(MA_SUCCESS);
     tl::expected<sl::defer, ma_result> running_audio_device = tl::make_unexpected(MA_SUCCESS);
 
