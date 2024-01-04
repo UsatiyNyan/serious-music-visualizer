@@ -47,7 +47,7 @@ struct AudioDeviceControls {
             std::pair{ ma_device_type_loopback, std::string_view{ "loopback" } },
         };
 
-        if (ImGui::Begin("device controls", nullptr, ImGuiWindowFlags_NoMove)) {
+        if (ImGui::Begin("device controls", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize)) {
             ImGui::SetWindowPos(ImVec2{ 0.0f, 0.0f });
             ImGui::SetWindowSize(ImVec2{ 0.0f, 80.0f });
 
@@ -87,85 +87,14 @@ struct AudioDeviceControls {
                 }
                 ImGui::EndCombo();
             }
-
-            ImGui::End();
         }
+        ImGui::End();
 
         return sl::meta::combine(device_type, index).map([](const auto& values) {
             return sl::meta::construct_from_tuple<AudioDeviceState>(values);
         });
     }
 };
-
-void draw_complex_data(
-    std::string_view name,
-    const auto values_getter,
-    std::span<const std::complex<float>> points,
-    float scale_min,
-    float scale_max
-) {
-    if (points.empty()) {
-        return;
-    }
-
-    constexpr ImVec2 graph_size(0, 80);
-    void* points_data = const_cast<void*>(static_cast<const void*>(points.data()));
-    ImGui::PlotLines(
-        name.data(),
-        values_getter,
-        points_data,
-        static_cast<int>(points.size()),
-        0,
-        nullptr,
-        scale_min,
-        scale_max,
-        graph_size
-    );
-}
-
-std::vector<std::complex<float>> to_log_domain(std::span<const std::complex<float>> linear_domain_points) {
-    std::vector<std::complex<float>> log_domain_points(linear_domain_points.size());
-    const float N = static_cast<float>(linear_domain_points.size());
-    const float logN = std::log(N);
-
-    // Preprocess the data
-    for (std::size_t i = 0; i < linear_domain_points.size(); ++i) {
-        // Compute the log-scaled x-coordinate
-        const float logX = std::log(static_cast<float>(i + 1)) / logN;
-
-        // Find the corresponding index (this may involve interpolation)
-        const std::size_t index = static_cast<std::size_t>(logX * (N - 1));
-        log_domain_points[index] = linear_domain_points[i];
-    }
-
-    return log_domain_points;
-}
-
-// purely for debugging purposes
-std::vector<std::complex<float>> interpolate_log_domain(const std::vector<std::complex<float>>& log_domain_points) {
-    std::vector<std::complex<float>> interpolated_points = log_domain_points;
-    const std::size_t N_size = log_domain_points.size();
-
-    for (std::size_t i = 0; i < N_size; ++i) {
-        if (interpolated_points[i] == std::complex<float>(0, 0)) { // Check if the point is unfilled
-            // Find the nearest non-zero points before and after index i
-            std::size_t prev = i;
-            std::size_t next = i;
-            while (prev > 0 && interpolated_points[prev] == std::complex<float>(0, 0)) {
-                --prev;
-            }
-            while (next < N_size - 1 && interpolated_points[next] == std::complex<float>(0, 0)) {
-                ++next;
-            }
-
-            // Linear interpolation for complex numbers
-            float alpha = static_cast<float>(i - prev) / static_cast<float>(next - prev);
-            interpolated_points[i] = (1 - alpha) * interpolated_points[prev] + alpha * interpolated_points[next];
-        }
-    }
-
-    return interpolated_points;
-}
 
 int main() {
     const sl::gfx::Context::Options ctx_options{ 4, 6, GLFW_OPENGL_CORE_PROFILE };
@@ -178,6 +107,7 @@ int main() {
     auto current_window =
         window->make_current(sl::gfx::Vec2I{}, window_size, sl::gfx::Color4F{ 0.0f, 0.0f, 0.0f, 1.0f });
     sl::gfx::ImGuiContext imgui_context{ ctx_options, *window };
+    sl::gfx::ImPlotContext implot_context{ imgui_context };
 
     const sa::AudioContext audio_context;
     tl::optional<AudioDeviceState> audio_device_state;
@@ -198,7 +128,7 @@ int main() {
     } };
 
     constexpr ma_uint32 audio_capture_channels = 2;
-    constexpr std::size_t audio_data_frame_count = 1024;
+    constexpr std::size_t audio_data_frame_count = 2048;
     constexpr std::size_t max_audio_data_coef = 16;
     std::vector<float> audio_data;
     audio_data.reserve(audio_capture_channels * audio_data_frame_count);
@@ -209,6 +139,35 @@ int main() {
             current_window.set_should_close(true);
         }
         current_window.clear(GL_COLOR_BUFFER_BIT);
+
+        // DATA PROCESSING LAYER
+        // FETCH AUDIO DATA
+        if (const auto* audio_data_ptr = audio_data_callback->data_queue.front();
+            audio_data_ptr != nullptr
+            && audio_data.size() < max_audio_data_coef * audio_capture_channels * audio_data_frame_count) {
+            audio_data.insert(audio_data.end(), audio_data_ptr->begin(), audio_data_ptr->end());
+            audio_data_callback->data_queue.pop();
+        }
+
+        // FILL AUDIO DATA
+        if (audio_data.size() >= audio_capture_channels * audio_data_frame_count) {
+            // capture.channels=2
+            // take only 0th channel, which is left for stereo, for now
+            const auto time_domain_input_range = audio_data //
+                                                 | ranges::views::stride(audio_capture_channels) //
+                                                 | ranges::views::take(audio_data_frame_count);
+            time_domain_input.assign(time_domain_input_range.begin(), time_domain_input_range.end());
+
+            audio_data.erase(
+                audio_data.begin(),
+                audio_data.begin() + static_cast<std::int64_t>(audio_capture_channels * audio_data_frame_count)
+            );
+        }
+
+        // CALCULATE FFT
+        const auto freq_domain_output = sl::calc::fourier::fft<sl::calc::fourier::direction::time_to_freq>(
+            std::span<const std::complex<float>>{ time_domain_input }
+        );
 
         // DRAW LAYER
         // VISUALIZE AUDIO DATA
@@ -249,94 +208,36 @@ int main() {
             running_audio_device = audio_device.and_then(sa::make_running_device_guard);
         }
 
-        // FETCH AUDIO DATA
-        if (const auto* audio_data_ptr = audio_data_callback->data_queue.front();
-            audio_data_ptr != nullptr
-            && audio_data.size() < max_audio_data_coef * audio_capture_channels * audio_data_frame_count) {
-            audio_data.insert(audio_data.end(), audio_data_ptr->begin(), audio_data_ptr->end());
-            audio_data_callback->data_queue.pop();
-        }
-
-        // FILL AUDIO DATA
-        if (audio_data.size() >= audio_capture_channels * audio_data_frame_count) {
-            // capture.channels=2
-            // take only 0th channel, which is left for stereo, for now
-            const auto time_domain_input_range = audio_data //
-                                                 | ranges::views::stride(audio_capture_channels) //
-                                                 | ranges::views::take(audio_data_frame_count);
-            time_domain_input.assign(time_domain_input_range.begin(), time_domain_input_range.end());
-
-            audio_data.erase(
-                audio_data.begin(),
-                audio_data.begin() + static_cast<std::int64_t>(audio_capture_channels * audio_data_frame_count)
-            );
-        }
-
         // DEBUG AUDIO DATA PROCESSING
-        if (ImGui::Begin("debug audio data processing")) {
-            const auto freq_domain_output =
-                sl::calc::fourier::fft_recursive<sl::calc::fourier::direction::time_to_freq>(
-                    std::span<const std::complex<float>>{ time_domain_input }
+        if (ImGui::Begin("debug audio data processing", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize)) {
+            // TODO: FPS
+            constexpr ImVec2 debug_window_size{ 600.0f, 400.0f };
+            const ImGuiViewport* viewport = ImGui::GetMainViewport();
+            const ImVec2 debug_window_pos{ viewport->WorkPos.x + viewport->WorkSize.x - debug_window_size.x,
+                                           viewport->WorkPos.y };
+            ImGui::SetWindowSize(debug_window_size);
+            ImGui::SetWindowPos(debug_window_pos);
+
+            if (ImPlot::BeginPlot("log domain", ImVec2{-1.0f, -1.0f})) {
+                constexpr double max_amp = static_cast<double>(audio_data_frame_count);
+                const double log10_max_amp = std::log10(max_amp);
+                const auto half_freq_domain = freq_domain_output //
+                                              | ranges::views::take(freq_domain_output.size() / 2)
+                                              | ranges::views::transform([](std::complex<float> complex_value) {
+                                                    return std::log10(std::abs(complex_value));
+                                                })
+                                              | ranges::to<std::vector>();
+
+                ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
+                ImPlot::SetupAxisLimits(ImAxis_X1, 1.0, static_cast<double>(half_freq_domain.size()));
+                ImPlot::SetupAxisLimits(ImAxis_Y1, -log10_max_amp, log10_max_amp);
+                ImPlot::PlotLine(
+                    "g(omega) = log10(abs(F(omega))", half_freq_domain.data(), static_cast<int>(half_freq_domain.size())
                 );
-
-            draw_complex_data(
-                "time_domain",
-                [](void* data, int idx) -> float {
-                    const auto* v = static_cast<const std::complex<float>*>(data);
-                    return v[static_cast<std::size_t>(idx)].real();
-                },
-                time_domain_input,
-                -1.0f,
-                1.0f
-            );
-            draw_complex_data(
-                "freq_domain",
-                [](void* data, int idx) -> float {
-                    const auto* v = static_cast<const std::complex<float>*>(data);
-                    return std::abs(v[static_cast<std::size_t>(idx)]);
-                },
-                freq_domain_output,
-                0.0f,
-                64.0f
-            );
-
-            const std::span half_freq_domain{
-                freq_domain_output.begin(),
-                freq_domain_output.begin() + static_cast<std::int64_t>(freq_domain_output.size() / 2),
-            };
-            draw_complex_data(
-                "half_freq_domain",
-                [](void* data, int idx) -> float {
-                    const auto* v = static_cast<const std::complex<float>*>(data);
-                    return std::abs(v[static_cast<std::size_t>(idx)]);
-                },
-                half_freq_domain,
-                0.0f,
-                64.0f
-            );
-
-            constexpr auto log_abs_value_getter = [](void* data, int idx) -> float {
-                const auto* v = static_cast<const std::complex<float>*>(data);
-                return std::log(std::abs(v[static_cast<std::size_t>(idx)]));
-            };
-            draw_complex_data("log_half_freq_domain", log_abs_value_getter, half_freq_domain, 0.0f, std::log(64.0f));
-
-            const auto half_freq_log_domain = to_log_domain(half_freq_domain);
-            draw_complex_data(
-                "log_half_freq_log_domain", log_abs_value_getter, half_freq_log_domain, 0.0f, std::log(64.0f)
-            );
-
-            const auto interpolate_half_freq_log_domain = interpolate_log_domain(half_freq_log_domain);
-            draw_complex_data(
-                "log_interpolate_half_freq_log_domain",
-                log_abs_value_getter,
-                interpolate_half_freq_log_domain,
-                0.0f,
-                std::log(64.0f)
-            );
-
-            ImGui::End();
+                ImPlot::EndPlot();
+            }
         }
+        ImGui::End();
 
         imgui_context.render();
         current_window.swap_buffers();
