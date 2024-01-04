@@ -127,9 +127,10 @@ int main() {
         .data_queue = rigtorp::SPSCQueue<std::vector<float>>{ audio_data_queue_capacity },
     } };
 
-    constexpr ma_uint32 audio_capture_channels = 2;
-    constexpr std::size_t audio_data_frame_count = 2048;
-    constexpr std::size_t max_audio_data_coef = 16;
+    constexpr ma_uint32 audio_capture_channels = 1;
+    constexpr std::size_t audio_data_frame_count = 4096;
+    constexpr std::size_t max_audio_data_frame_count = audio_data_frame_count * 16;
+    constexpr std::size_t audio_data_frame_window = audio_data_frame_count / 2;
     std::vector<float> audio_data;
     audio_data.reserve(audio_capture_channels * audio_data_frame_count);
     std::vector<std::complex<float>> time_domain_input(audio_data_frame_count);
@@ -143,8 +144,7 @@ int main() {
         // DATA PROCESSING LAYER
         // FETCH AUDIO DATA
         if (const auto* audio_data_ptr = audio_data_callback->data_queue.front();
-            audio_data_ptr != nullptr
-            && audio_data.size() < max_audio_data_coef * audio_capture_channels * audio_data_frame_count) {
+            audio_data_ptr != nullptr && audio_data.size() < audio_capture_channels * max_audio_data_frame_count) {
             audio_data.insert(audio_data.end(), audio_data_ptr->begin(), audio_data_ptr->end());
             audio_data_callback->data_queue.pop();
         }
@@ -160,7 +160,7 @@ int main() {
 
             audio_data.erase(
                 audio_data.begin(),
-                audio_data.begin() + static_cast<std::int64_t>(audio_capture_channels * audio_data_frame_count)
+                audio_data.begin() + static_cast<std::int64_t>(audio_capture_channels * audio_data_frame_window)
             );
         }
 
@@ -219,7 +219,7 @@ int main() {
 
             ImGui::Text("FPS: %.1f", static_cast<double>(ImGui::GetIO().Framerate));
 
-            if (ImPlot::BeginPlot("log domain", ImVec2{-1.0f, -1.0f})) {
+            if (ImPlot::BeginPlot("log domain", ImVec2{ -1.0f, -1.0f })) {
                 constexpr double max_amp = static_cast<double>(audio_data_frame_count);
                 const double log10_max_amp = std::log10(max_amp);
                 const auto half_freq_domain = freq_domain_output //
@@ -233,7 +233,7 @@ int main() {
                 ImPlot::SetupAxisLimits(ImAxis_X1, 1.0, static_cast<double>(half_freq_domain.size()));
                 ImPlot::SetupAxisLimits(ImAxis_Y1, -log10_max_amp, log10_max_amp);
                 ImPlot::PlotLine(
-                    "g(omega) = log10(abs(F(omega))", half_freq_domain.data(), static_cast<int>(half_freq_domain.size())
+                    "map (log10 abs) (F omega)", half_freq_domain.data(), static_cast<int>(half_freq_domain.size())
                 );
                 ImPlot::EndPlot();
             }
