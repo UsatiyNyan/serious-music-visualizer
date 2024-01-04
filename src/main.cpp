@@ -210,13 +210,14 @@ int main() {
 
         // DEBUG AUDIO DATA PROCESSING
         if (ImGui::Begin("debug audio data processing", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize)) {
-            // TODO: FPS
             constexpr ImVec2 debug_window_size{ 600.0f, 400.0f };
             const ImGuiViewport* viewport = ImGui::GetMainViewport();
             const ImVec2 debug_window_pos{ viewport->WorkPos.x + viewport->WorkSize.x - debug_window_size.x,
                                            viewport->WorkPos.y };
             ImGui::SetWindowSize(debug_window_size);
             ImGui::SetWindowPos(debug_window_pos);
+
+            ImGui::Text("FPS: %.1f", static_cast<double>(ImGui::GetIO().Framerate));
 
             if (ImPlot::BeginPlot("log domain", ImVec2{-1.0f, -1.0f})) {
                 constexpr double max_amp = static_cast<double>(audio_data_frame_count);
