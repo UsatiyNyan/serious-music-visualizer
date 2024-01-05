@@ -27,6 +27,7 @@ add_library(${PROJECT_NAME} STATIC
         src/sa/audio_data.cpp
         src/sa/audio_data_debug_window.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC include)
+sl_target_attach_directory(${PROJECT_NAME} shaders)
 
 add_executable(${PROJECT_NAME}-app src/main.cpp)
 target_link_libraries(${PROJECT_NAME}-app PRIVATE ${PROJECT_NAME})

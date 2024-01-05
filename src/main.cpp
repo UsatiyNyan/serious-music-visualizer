@@ -9,12 +9,49 @@
 
 #include <sl/calc/fourier.hpp>
 #include <sl/gfx.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #include <range/v3/view/stride.hpp>
 #include <range/v3/view/take.hpp>
 #include <range/v3/view/transform.hpp>
 
 #include <assert.hpp>
+
+enum class DrawModes : unsigned {
+    DRAW_CIRCLES = 0,
+    DEFAULT_FILL,
+};
+
+constexpr auto create_shader_program = []() {
+    const std::array<sl::gfx::Shader, 2> shaders{
+        *ASSERT(sl::gfx::Shader::load_from_file(sl::gfx::ShaderType::VERTEX, "shaders/music_visualizer.vert")),
+        *ASSERT(sl::gfx::Shader::load_from_file(sl::gfx::ShaderType::FRAGMENT, "shaders/music_visualizer.frag")),
+    };
+    sl::gfx::ShaderProgram sp{ std::span{ shaders } };
+    auto sp_bind = sp.bind();
+    auto set_transform = *ASSERT(sp_bind.make_uniform_matrix_v_setter(glUniformMatrix4fv, "u_transform", 1, false));
+    auto set_mode = *ASSERT(sp_bind.make_uniform_setter(glUniform1ui, "u_mode"));
+    return std::make_tuple(std::move(sp), std::move(set_transform), std::move(set_mode));
+};
+
+struct Vert {
+    sl::gfx::va_attrib_field<2, float> pos;
+};
+
+constexpr auto create_buffers = [](std::span<const Vert, 4> vertices) {
+    sl::gfx::VertexArrayBuilder va_builder;
+    va_builder.attributes_from<Vert>();
+    auto vb = va_builder.buffer<sl::gfx::BufferType::ARRAY, sl::gfx::BufferUsage::STATIC_DRAW>(vertices);
+    constexpr std::array<unsigned, 6> indices{
+        0u, 1u, 3u, // first triangle
+        1u, 2u, 3u, // second triangle
+    };
+    auto eb =
+        va_builder.buffer<sl::gfx::BufferType::ELEMENT_ARRAY, sl::gfx::BufferUsage::STATIC_DRAW>(std::span{ indices });
+    auto va = std::move(va_builder).submit();
+    return std::make_tuple(std::move(vb), std::move(eb), std::move(va));
+};
 
 int main() {
     const sl::gfx::Context::Options ctx_options{ 4, 6, GLFW_OPENGL_CORE_PROFILE };
@@ -28,6 +65,19 @@ int main() {
         window->make_current(sl::gfx::Vec2I{}, window_size, sl::gfx::Color4F{ 0.0f, 0.0f, 0.0f, 1.0f });
     sl::gfx::ImGuiContext imgui_context{ ctx_options, *window };
     sl::gfx::ImPlotContext implot_context{ imgui_context };
+
+    constexpr std::array vertices{
+        Vert{ +1.0f, +1.0f },
+        Vert{ +1.0f, -1.0f },
+        Vert{ -1.0f, -1.0f },
+        Vert{ -1.0f, +1.0f },
+    };
+    auto [sp, set_transform, set_mode] = create_shader_program();
+    auto [vb, eb, va] = create_buffers(vertices);
+
+    const auto transform = glm::mat4(1.0f);
+    set_transform(sp.bind(), glm::value_ptr(transform));
+    set_mode(sp.bind(), static_cast<unsigned>(DrawModes::DRAW_CIRCLES));
 
     const sa::AudioContext audio_context;
     tl::optional<sa::AudioDeviceControls::State> audio_device_controls_state;
@@ -86,7 +136,13 @@ int main() {
         // DRAW LAYER
         // VISUALIZE AUDIO DATA
         {
-            // TODO(@usatiynyan)
+            // TODO(@usatiynyan):
+            //  - render quadratic surface (2 triangles)
+            //  - vertex shader should contain MVP, so that this surface is useable outside of this app
+            //  - fragment shader would draw spheres and such in modes, modes are controlled by uniform
+
+            sl::gfx::Draw draw{ sp, va, {} };
+            draw.elements(eb);
         }
 
         // IMGUI LAYER
