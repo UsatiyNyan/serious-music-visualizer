@@ -27,10 +27,6 @@ cpmaddpackage(
         GIT_REPOSITORY "git@github.com:fmtlib/fmt.git"
         GIT_TAG 10.1.1)
 cpmaddpackage(
-        NAME spdlog
-        GIT_REPOSITORY "git@github.com:gabime/spdlog.git"
-        GIT_TAG v1.12.0)
-cpmaddpackage(
         NAME libassert
         GIT_REPOSITORY "git@github.com:jeremy-rifkin/libassert.git"
         GIT_TAG main)
@@ -42,6 +38,7 @@ cpmaddpackage(
 
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/tl.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/spdlog.cmake")
 
 # Manually compiled
 add_subdirectory(miniaudio)
