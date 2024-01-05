@@ -22,7 +22,10 @@ project(
         LANGUAGES C CXX)
 
 add_library(${PROJECT_NAME} STATIC
-        src/audio.cpp)
+        src/sa/audio_context.cpp
+        src/sa/audio_device_controls.cpp
+        src/sa/audio_data.cpp
+        src/sa/audio_data_debug_window.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC include)
 
 add_executable(${PROJECT_NAME}-app src/main.cpp)
