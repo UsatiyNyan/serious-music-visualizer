@@ -17,7 +17,7 @@
 
 namespace sa {
 
-tl::expected<sl::defer, ma_result> make_running_device_guard(const ma::device_uptr& device);
+tl::expected<sl::meta::defer, ma_result> make_running_device_guard(const ma::device_uptr& device);
 
 struct AudioDeviceConfig {
     std::size_t index;

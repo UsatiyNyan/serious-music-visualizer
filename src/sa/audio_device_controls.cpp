@@ -27,7 +27,7 @@ tl::optional<AudioDeviceControls::State> AudioDeviceControls::update() {
         std::pair{ ma_device_type_loopback, std::string_view{ "loopback" } },
     };
 
-    if (const sl::defer imgui_end{ ImGui::End };
+    if (const sl::meta::defer imgui_end{ ImGui::End };
         ImGui::Begin("device controls", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize)) {
         ImGui::SetWindowPos(ImVec2{ 0.0f, 0.0f });
         ImGui::SetWindowSize(ImVec2{ 0.0f, 80.0f });

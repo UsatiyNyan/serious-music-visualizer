@@ -83,7 +83,7 @@ int main() {
     tl::optional<sa::AudioDeviceControls::State> audio_device_controls_state;
     sa::AudioDeviceControls audio_device_controls{ audio_context.capture_infos() };
     tl::expected<ma::device_uptr, ma_result> audio_device = tl::make_unexpected(MA_SUCCESS);
-    tl::expected<sl::defer, ma_result> running_audio_device = tl::make_unexpected(MA_SUCCESS);
+    tl::expected<sl::meta::defer, ma_result> running_audio_device = tl::make_unexpected(MA_SUCCESS);
 
     constexpr std::size_t audio_data_queue_capacity = 1;
     const auto audio_data_callback = std::make_unique<sa::AudioDataCallback>(audio_data_queue_capacity);

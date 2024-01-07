@@ -11,7 +11,7 @@
 namespace sa {
 
 void show_audio_data_debug_window(const AudioDataConfig& config, std::span<const float> processed_freq_domain_output) {
-    if (const sl::defer imgui_end{ ImGui::End };
+    if (const sl::meta::defer imgui_end{ ImGui::End };
         ImGui::Begin("debug audio data processing", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize)) {
         constexpr ImVec2 debug_window_size{ 600.0f, 400.0f };
         const ImGuiViewport* viewport = ImGui::GetMainViewport();

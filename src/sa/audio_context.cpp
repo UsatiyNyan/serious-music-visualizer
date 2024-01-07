@@ -21,9 +21,9 @@ ma_result log_error(ma_result result) {
 
 } // namespace
 
-tl::expected<sl::defer, ma_result> make_running_device_guard(const ma::device_uptr& device) {
+tl::expected<sl::meta::defer, ma_result> make_running_device_guard(const ma::device_uptr& device) {
     return ma::device_start(device).map([&](tl::monostate) {
-        return sl::defer{ [&] { ASSERT(ma::device_stop(device).map_error(log_error)); } };
+        return sl::meta::defer{ [&] { ASSERT(ma::device_stop(device).map_error(log_error)); } };
     });
 }
 
