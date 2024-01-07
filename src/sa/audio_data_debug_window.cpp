@@ -23,13 +23,13 @@ void show_audio_data_debug_window(const AudioDataConfig& config, std::span<const
         ImGui::Text("FPS: %.1f", static_cast<double>(ImGui::GetIO().Framerate));
 
         if (ImPlot::BeginPlot("log domain", ImVec2{ -1.0f, -1.0f })) {
-            const double log10_max_amp = std::log10(static_cast<double>(config.frame_count));
+            const double log_max_amp = std::log(static_cast<double>(config.frame_count));
 
             ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
             ImPlot::SetupAxisLimits(ImAxis_X1, 1.0, static_cast<double>(processed_freq_domain_output.size()));
-            ImPlot::SetupAxisLimits(ImAxis_Y1, -log10_max_amp, log10_max_amp);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, -log_max_amp, log_max_amp);
             ImPlot::PlotLine(
-                "map (log10 abs) (F omega)",
+                "map (log abs) (F omega)",
                 processed_freq_domain_output.data(),
                 static_cast<int>(processed_freq_domain_output.size())
             );
