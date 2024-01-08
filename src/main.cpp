@@ -20,7 +20,8 @@
 #include <assert.hpp>
 
 enum class DrawModes : unsigned {
-    DRAW_RADIUS = 0,
+    RADIUS_LINEAR = 0,
+    RADIUS_LOG = 1,
     DEFAULT_FILL,
 };
 
@@ -107,7 +108,7 @@ int main() {
         const auto sp_bind = sp.bind();
         const auto transform = glm::mat4(1.0f);
         set_transform(sp_bind, glm::value_ptr(transform));
-        set_mode(sp.bind(), static_cast<unsigned>(DrawModes::DRAW_RADIUS));
+        set_mode(sp.bind(), static_cast<unsigned>(DrawModes::RADIUS_LOG));
         set_window_size(sp.bind(), static_cast<float>(window_size.width), static_cast<float>(window_size.height));
 
         window->FramebufferSize_cb = [&window,
@@ -115,6 +116,7 @@ int main() {
                                       set_window_size_ref = std::ref(set_window_size)](GLsizei width, GLsizei height) {
             sl::gfx::Window::Current{ *window }.viewport(sl::gfx::Vec2I{}, sl::gfx::Size2I{ width, height });
             set_window_size_ref(sp_ref.get().bind(), static_cast<float>(width), static_cast<float>(height));
+            // TODO(@usatiynyan): resize ImGui too
         };
     }
 
@@ -209,6 +211,8 @@ int main() {
 
             running_audio_device = audio_device.and_then(sa::make_running_device_guard);
         }
+
+        // VISUALIZATION CONTROLS
 
         // DEBUG AUDIO DATA
         sa::show_audio_data_debug_window(audio_config, processed_freq_domain_output);

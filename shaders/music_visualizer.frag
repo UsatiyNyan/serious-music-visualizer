@@ -9,10 +9,19 @@ layout (std430, binding = 0) readonly buffer normalized_freq_domain_output {
     float data[1024];
 } nfdo;
 
-vec4 draw_radius(vec2 uv, float radius) {
-    const float N = 1024.0f;
-    const uint index = uint(length(uv / radius) * N);
-    const float color_coef = index < 1024 ? nfdo.data[index] : 0.0f;
+float logspace(uint index, uint N) {
+    const float logN = log(float(N));
+    return exp(float(index) * logN / float(N - 1));
+}
+
+float color_coef(uint index, uint N) {
+    return index < N ? nfdo.data[index] : 0.0f;
+}
+
+vec4 draw_radius(vec2 uv, float radius, bool is_logspace) {
+    const uint N = 1024;
+    const uint index = uint(length(uv) / radius * N);
+    const float color_coef = color_coef(is_logspace ? uint(logspace(index, N)) : index, N);
     const vec3 color_a = vec3(0.0f, 0.0f, 0.0f);
     const vec3 color_b = vec3(0.5f, 0.0f, 0.5f);
     const float alpha = 1.0f;
@@ -30,8 +39,11 @@ void main() {
     : vec2(u_window_size.x / u_window_size.y, 1.0f);
     const vec2 uv = (normalized_coord * 2.0f - 1.0f) * aspect_ratio;
     switch (u_mode) {
-        case 0:
-            frag_color = draw_radius(uv, 2.0f);
+        case 0: // RADIUS_LINEAR
+            frag_color = draw_radius(uv, 1.5f, /*is_logspace=*/false);
+            break;
+        case 1: // RADIUS_LOG
+            frag_color = draw_radius(uv, 1.5f, /*is_logspace=*/true);
             break;
         default:
             frag_color = default_fill();
