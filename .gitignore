@@ -1,8 +1,10 @@
 # IDE
 .idea
+.cache
 
 # BUILD
 *-build-*
+/build
 
 # CMAKE
 CMakeLists.txt.user

@@ -111,6 +111,7 @@ int main() {
         set_mode(sp.bind(), static_cast<unsigned>(DrawModes::RADIUS_LOG));
         set_window_size(sp.bind(), static_cast<float>(window_size.width), static_cast<float>(window_size.height));
 
+        // TODO(@usatiynyan): fix gcc warning -Werror=null-dereference
         window->FramebufferSize_cb = [&window,
                                       sp_ref = std::ref(sp),
                                       set_window_size_ref = std::ref(set_window_size)](GLsizei width, GLsizei height) {

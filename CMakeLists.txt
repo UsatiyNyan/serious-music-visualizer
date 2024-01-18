@@ -40,7 +40,7 @@ if (NOT PROJECT_IS_TOP_LEVEL)
     return()
 endif ()
 
-sl_compiler_warnings(${PROJECT_NAME} WARNINGS_AS_ERRORS)
+sl_compiler_warnings(${PROJECT_NAME} WARNINGS_AS_ERRORS EXTRA_GCC_WARNINGS "-Wno-null-dereference")
 
 include(CTest)
 if (BUILD_TESTING)
