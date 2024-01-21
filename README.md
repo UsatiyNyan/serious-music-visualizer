@@ -1,6 +1,10 @@
 # serious-music-visualizer
 By serious programmer.
 
+# demo
+
+- [log mode](https://www.youtube.com/watch?v=tjGEA5m6VYo)
+
 # dependencies
 
 ## X11
