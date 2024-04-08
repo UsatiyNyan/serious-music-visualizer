@@ -17,7 +17,7 @@
 #include <range/v3/view/take.hpp>
 #include <range/v3/view/transform.hpp>
 
-#include <assert.hpp>
+#include <libassert/assert.hpp>
 
 enum class DrawModes : unsigned {
     RADIUS_LINEAR = 0,
@@ -27,14 +27,14 @@ enum class DrawModes : unsigned {
 
 auto create_shader_program() {
     const std::array<sl::gfx::Shader, 2> shaders{
-        *ASSERT(sl::gfx::Shader::load_from_file(sl::gfx::ShaderType::VERTEX, "shaders/music_visualizer.vert")),
-        *ASSERT(sl::gfx::Shader::load_from_file(sl::gfx::ShaderType::FRAGMENT, "shaders/music_visualizer.frag")),
+        *ASSERT_VAL(sl::gfx::Shader::load_from_file(sl::gfx::ShaderType::VERTEX, "shaders/music_visualizer.vert")),
+        *ASSERT_VAL(sl::gfx::Shader::load_from_file(sl::gfx::ShaderType::FRAGMENT, "shaders/music_visualizer.frag")),
     };
-    sl::gfx::ShaderProgram sp{ std::span{ shaders } };
+    auto sp = *ASSERT_VAL(sl::gfx::ShaderProgram::build(std::span{ shaders }));
     auto sp_bind = sp.bind();
-    auto set_transform = *ASSERT(sp_bind.make_uniform_matrix_v_setter(glUniformMatrix4fv, "u_transform", 1, false));
-    auto set_mode = *ASSERT(sp_bind.make_uniform_setter(glUniform1ui, "u_mode"));
-    auto set_window_size = *ASSERT(sp_bind.make_uniform_setter(glUniform2f, "u_window_size"));
+    auto set_transform = *ASSERT_VAL(sp_bind.make_uniform_matrix_v_setter(glUniformMatrix4fv, "u_transform", 1, false));
+    auto set_mode = *ASSERT_VAL(sp_bind.make_uniform_setter(glUniform1ui, "u_mode"));
+    auto set_window_size = *ASSERT_VAL(sp_bind.make_uniform_setter(glUniform2f, "u_window_size"));
     return std::make_tuple(std::move(sp), std::move(set_transform), std::move(set_mode), std::move(set_window_size));
 }
 
@@ -78,9 +78,9 @@ auto create_buffers(std::span<const Vert, 4> vertices) {
 
 int main() {
     const sl::gfx::Context::Options ctx_options{ 4, 6, GLFW_OPENGL_CORE_PROFILE };
-    auto ctx = *ASSERT(sl::gfx::Context::create(ctx_options));
+    auto ctx = *ASSERT_VAL(sl::gfx::Context::create(ctx_options));
     const sl::gfx::Size2I window_size{ 1280, 720 };
-    const auto window = ASSERT(sl::gfx::Window::create(ctx, "serious music visualizer", window_size));
+    const auto window = ASSERT_VAL(sl::gfx::Window::create(ctx, "serious music visualizer", window_size));
     auto current_window =
         window->make_current(sl::gfx::Vec2I{}, window_size, sl::gfx::Color4F{ 0.0f, 0.0f, 0.0f, 1.0f });
     sl::gfx::ImGuiContext imgui_context{ ctx_options, *window };
@@ -112,13 +112,15 @@ int main() {
         set_window_size(sp.bind(), static_cast<float>(window_size.width), static_cast<float>(window_size.height));
 
         // TODO(@usatiynyan): fix gcc warning -Werror=null-dereference
-        window->FramebufferSize_cb = [&window,
-                                      sp_ref = std::ref(sp),
-                                      set_window_size_ref = std::ref(set_window_size)](GLsizei width, GLsizei height) {
-            sl::gfx::Window::Current{ *window }.viewport(sl::gfx::Vec2I{}, sl::gfx::Size2I{ width, height });
-            set_window_size_ref(sp_ref.get().bind(), static_cast<float>(width), static_cast<float>(height));
-            // TODO(@usatiynyan): resize ImGui too
-        };
+        (void)window->FramebufferSize_cb.connect( //
+            [&window,
+             sp_ref = std::ref(sp),
+             set_window_size_ref = std::ref(set_window_size)](GLsizei width, GLsizei height) {
+                sl::gfx::Window::Current{ *window }.viewport(sl::gfx::Vec2I{}, sl::gfx::Size2I{ width, height });
+                set_window_size_ref(sp_ref.get().bind(), static_cast<float>(width), static_cast<float>(height));
+                // TODO(@usatiynyan): resize ImGui too
+            }
+        );
     }
 
     const sa::AudioContext audio_context;

@@ -4,7 +4,7 @@
 
 #include "sa/audio_context.hpp"
 
-#include <assert.hpp>
+#include <libassert/assert.hpp>
 #include <spdlog/spdlog.h>
 
 namespace sa {
@@ -28,8 +28,8 @@ tl::expected<sl::meta::defer, ma_result> make_running_device_guard(const ma::dev
 }
 
 AudioContext::AudioContext(const std::vector<ma_backend>& backends, const ma_context_config& context_config)
-    : context_{ *ASSERT(ma::context_init(backends, context_config).map_error(log_error)) } {
-    auto [playback_infos, capture_infos] = *ASSERT(ma::context_get_devices(context_).map_error(log_error));
+    : context_{ *ASSERT_VAL(ma::context_init(backends, context_config).map_error(log_error)) } {
+    auto [playback_infos, capture_infos] = *ASSERT_VAL(ma::context_get_devices(context_).map_error(log_error));
     playback_infos_ = playback_infos;
     capture_infos_ = capture_infos;
 }

@@ -56,7 +56,7 @@ sl_target_link_system_libraries(${PROJECT_NAME}
         spdlog::spdlog
 
         # utils
-        assert
+        libassert::assert
 
         # audio
         miniaudio
