@@ -16,7 +16,7 @@ sl_project_prologue(
 
 project(
         serious-music-visualizer
-        VERSION 0.0.1
+        VERSION 1.0.0
         DESCRIPTION "music visualizer"
         HOMEPAGE_URL "TODO"
         LANGUAGES C CXX)
