@@ -6,6 +6,7 @@
 
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
+#undef MINIAUDIO_IMPLEMENTATION
 
 namespace ma {
 

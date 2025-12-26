@@ -6,9 +6,9 @@
 
 #include "miniaudio/miniaudio.hpp"
 
-#include <assert.hpp>
 #include <fmt/format.h>
 #include <range/v3/view/enumerate.hpp>
+#include <libassert/assert.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -28,7 +28,7 @@ constexpr auto data_callback =
             }
         }
 
-        auto* highest_amplitude = ASSERT(static_cast<std::atomic<std::float_t>*>(device->pUserData));
+        auto* highest_amplitude = ASSERT_VAL(static_cast<std::atomic<std::float_t>*>(device->pUserData));
         highest_amplitude->store(curr_highest_amplitude, std::memory_order::release);
     };
 
@@ -40,10 +40,10 @@ tl::monostate log_error(ma_result result) {
 int main() {
     const std::vector loopback_backends{ ma_backend_pulseaudio, ma_backend_wasapi };
     const ma_context_config context_config = ma_context_config_init();
-    const auto context = *ASSERT(ma::context_init(loopback_backends, context_config).map_error(log_error));
+    const auto context = *ASSERT_VAL(ma::context_init(loopback_backends, context_config).map_error(log_error));
     fmt::println("context backend: {}", ma::get_backend_name(context->backend));
 
-    const auto& [playback_infos, capture_infos] = *ASSERT(ma::context_get_devices(context).map_error(log_error));
+    const auto& [playback_infos, capture_infos] = *ASSERT_VAL(ma::context_get_devices(context).map_error(log_error));
     for (const auto& [i, playback_info] : ranges::views::enumerate(playback_infos)) {
         fmt::println("playback[{}]={} ", i, playback_info.name);
     }
@@ -71,7 +71,7 @@ int main() {
     device_config.dataCallback = data_callback;
     device_config.pUserData = highest_amplitude.get();
 
-    const auto device = *ASSERT(ma::device_init(context, device_config).map_error(log_error));
+    const auto device = *ASSERT_VAL(ma::device_init(context, device_config).map_error(log_error));
     fmt::println("Device Name: {}", device->capture.name);
 
     ASSERT(ma::device_start(device).map_error(log_error));

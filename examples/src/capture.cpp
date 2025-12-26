@@ -4,8 +4,8 @@
 
 #include "miniaudio/miniaudio.hpp"
 
-#include <assert.hpp>
 #include <fmt/format.h>
+#include <libassert/assert.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -13,12 +13,12 @@
 
 int main() {
     const ma_context_config context_config = ma_context_config_init();
-    const auto context = *ASSERT(ma::context_init({}, context_config));
+    const auto context = *ASSERT_VAL(ma::context_init({}, context_config));
     fmt::println("context backend: {}", ma_get_backend_name(context->backend));
 
     constexpr auto data_callback =
         [](ma_device* device, [[maybe_unused]] void* output, const void* input, ma_uint32 frame_count) {
-            ASSERT(device->capture.format == ma_format_f32);
+            ASSERT_VAL(device->capture.format == ma_format_f32);
             const float* input_f32 = static_cast<const float*>(input);
 
             float curr_highest_amplitude = 0;
@@ -29,7 +29,7 @@ int main() {
                 }
             }
 
-            auto* highest_amplitude = ASSERT(static_cast<std::atomic<std::float_t>*>(device->pUserData));
+            auto* highest_amplitude = ASSERT_VAL(static_cast<std::atomic<std::float_t>*>(device->pUserData));
             highest_amplitude->store(curr_highest_amplitude, std::memory_order::release);
         };
 
@@ -44,7 +44,7 @@ int main() {
     device_config.dataCallback = data_callback;
     device_config.pUserData = highest_amplitude.get();
 
-    const auto device = *ASSERT(ma::device_init(context, device_config));
+    const auto device = *ASSERT_VAL(ma::device_init(context, device_config));
     fmt::println("Device Name: {}", device->playback.name);
 
     ASSERT(ma::device_start(device));
