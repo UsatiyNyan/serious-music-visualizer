@@ -24,6 +24,10 @@ sudo apt install \
 
 ```shell
 cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel 8 --target serious-music-visualizer-app
+cmake --build build --parallel 8 --target serious-music-visualizer
 ```
+
+# TODO
+
+use native amount of channels for capture, use capture.channels after init
 

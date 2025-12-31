@@ -21,16 +21,18 @@ project(
         HOMEPAGE_URL "TODO"
         LANGUAGES C CXX)
 
-add_library(${PROJECT_NAME} STATIC
-        src/sa/audio_context.cpp
-        src/sa/audio_device_controls.cpp
-        src/sa/audio_data.cpp
-        src/sa/audio_data_debug_window.cpp)
-target_include_directories(${PROJECT_NAME} PUBLIC include)
-sl_target_attach_directory(${PROJECT_NAME} shaders)
+add_library(${PROJECT_NAME}-lib STATIC
+    src/audio/context.cpp
+    src/audio/data.cpp
+    src/visualizer/audio.cpp
+    src/visualizer/scene.cpp
+    src/visualizer/render.cpp
+)
+target_include_directories(${PROJECT_NAME}-lib PUBLIC include)
+sl_target_attach_directory(${PROJECT_NAME}-lib shaders)
 
-add_executable(${PROJECT_NAME}-app src/main.cpp)
-target_link_libraries(${PROJECT_NAME}-app PRIVATE ${PROJECT_NAME})
+add_executable(${PROJECT_NAME} src/main.cpp)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}-lib)
 
 add_subdirectory(dependencies)
 
@@ -40,7 +42,7 @@ if (NOT PROJECT_IS_TOP_LEVEL)
     return()
 endif ()
 
-sl_compiler_warnings(${PROJECT_NAME} WARNINGS_AS_ERRORS EXTRA_GCC_WARNINGS "-Wno-null-dereference")
+sl_compiler_warnings(${PROJECT_NAME}-lib WARNINGS_AS_ERRORS)
 
 include(CTest)
 if (BUILD_TESTING)

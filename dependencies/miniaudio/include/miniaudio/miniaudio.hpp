@@ -18,6 +18,8 @@ namespace ma {
 std::string_view result_description(ma_result result);
 std::string_view get_backend_name(ma_backend backend);
 
+sl::meta::result<std::vector<ma_backend>, ma_result> get_enabled_backends();
+
 using context_uninit = decltype(&ma_context_uninit);
 using context_uptr = std::unique_ptr<ma_context, context_uninit>;
 sl::meta::result<context_uptr, ma_result>

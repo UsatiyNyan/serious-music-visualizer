@@ -10,6 +10,7 @@ target_include_directories(miniaudio-wrapper
         include
         "${miniaudio_SOURCE_DIR}"
 )
+message("miniaudio_SOURCE_DIR=${miniaudio_SOURCE_DIR}")
 sl_target_link_system_libraries(miniaudio-wrapper
         PUBLIC
         sl::meta

@@ -2,7 +2,7 @@
 cpmaddpackage(
         NAME serious-game-library
         GIT_REPOSITORY "git@github.com:UsatiyNyan/serious-game-library.git"
-        GIT_TAG 0.0.1)
+        GIT_TAG 0.0.4)
 cpmaddpackage(
         NAME serious-calculation-library
         GIT_REPOSITORY "git@github.com:UsatiyNyan/serious-calculation-library.git"
@@ -11,7 +11,7 @@ cpmaddpackage(
 # Manually compiled
 add_subdirectory(miniaudio)
 
-sl_target_link_system_libraries(${PROJECT_NAME}
+sl_target_link_system_libraries(${PROJECT_NAME}-lib
         PUBLIC
         # serious libraries
         sl::game
@@ -20,3 +20,7 @@ sl_target_link_system_libraries(${PROJECT_NAME}
         # audio
         miniaudio-wrapper
 )
+
+if (UNIX AND NOT APPLE)
+    sl_target_link_system_libraries(${PROJECT_NAME}-lib PRIVATE pulse)
+endif()

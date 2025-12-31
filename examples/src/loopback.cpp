@@ -7,8 +7,8 @@
 #include "miniaudio/miniaudio.hpp"
 
 #include <fmt/format.h>
-#include <range/v3/view/enumerate.hpp>
 #include <libassert/assert.hpp>
+#include <range/v3/view/enumerate.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -32,9 +32,9 @@ constexpr auto data_callback =
         highest_amplitude->store(curr_highest_amplitude, std::memory_order::release);
     };
 
-tl::monostate log_error(ma_result result) {
+auto log_error(ma_result result) {
     fmt::println("Error: {}", ma::result_description(result));
-    return {};
+    return sl::meta::unit{};
 }
 
 int main() {

@@ -22,6 +22,14 @@ std::string_view get_backend_name(ma_backend backend) { return ma_get_backend_na
         }                                                   \
     } while (false)
 
+sl::meta::result<std::vector<ma_backend>, ma_result> get_enabled_backends() {
+    std::vector<ma_backend> enabled_backends(MA_BACKEND_COUNT, ma_backend_null);
+    std::size_t enabled_backends_size = 0;
+    MA_UNEXPECTED(ma_get_enabled_backends(enabled_backends.data(), enabled_backends.size(), &enabled_backends_size));
+    enabled_backends.resize(enabled_backends_size);
+    return enabled_backends;
+}
+
 sl::meta::result<context_uptr, ma_result>
     context_init(const std::vector<ma_backend>& backends, const ma_context_config& context_config) {
     context_uptr context{ new ma_context, &ma_context_uninit };
