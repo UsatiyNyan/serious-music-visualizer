@@ -231,7 +231,7 @@ void audio_overlay(
 
         ImGui::Text("FPS: %.1f", static_cast<double>(ImGui::GetIO().Framerate));
 
-        if (ImPlot::BeginPlot("log_abs_half_freq_domain", ImVec2{ -1.0f, -1.0f })) {
+        if (ImPlot::BeginPlot("log_abs_half_freq_domain", ImVec2{ -1.0f, 300.0f })) {
             const auto& vec = audio_state.intermediate.log_abs_half_freq_domain;
             const double log_max_amp = std::log(static_cast<double>(vec.size()));
             ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);

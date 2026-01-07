@@ -5,6 +5,7 @@
 #include "visualizer/render.hpp"
 
 #include <sl/game/graphics/buffer.hpp>
+#include <sl/meta/enum/to_string.hpp>
 
 namespace visualizer {
 
@@ -110,6 +111,38 @@ sl::exec::async<entt::entity>
     std::ignore = e_ctx.w_ctx.window->frame_buffer_size_cb.connect([&layer, entity](glm::ivec2 frame_buffer_size) {
         layer.registry.get<RenderState>(entity).window_size.set(static_cast<glm::fvec2>(frame_buffer_size));
     });
+    layer.registry.emplace<sl::game::overlay>(
+        entity,
+        [](sl::ecs::layer& layer, sl::gfx::imgui_frame& imgui_frame, entt::entity entity) {
+            auto& state = layer.registry.get<RenderState>(entity);
+            if (auto imgui_window = imgui_frame.begin("render controls")) {
+                ImGui::SetWindowPos(ImVec2{ 350.0f, 0.0f });
+                ImGui::SetWindowSize(ImVec2{ 0.0f, 0.0f });
+
+                constexpr auto draw_mode_to_str = [](DrawMode draw_mode) {
+                    switch (draw_mode) {
+                    case DrawMode::RADIUS_LINEAR:
+                        return "radius linear";
+                    case DrawMode::RADIUS_LOG:
+                        return "radius log";
+                    default:
+                        break;
+                    }
+                    return "default";
+                };
+                const auto preview_draw_mode = state.draw_mode.get().map(draw_mode_to_str).value_or("");
+
+                if (ImGui::BeginCombo("draw mode", preview_draw_mode)) {
+                    for (DrawMode draw_mode{}; draw_mode != DrawMode::ENUM_END; draw_mode = sl::meta::next(draw_mode)) {
+                        if (ImGui::Selectable(draw_mode_to_str(draw_mode))) {
+                            state.draw_mode.set_if_ne(draw_mode);
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+            }
+        }
+    );
 
     co_return entity;
 }

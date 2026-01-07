@@ -28,7 +28,7 @@ sl::exec::async<sl::game::vertex> create_vertex(std::span<const VT, VE> vertices
 enum class DrawMode : GLuint {
     RADIUS_LINEAR = 0,
     RADIUS_LOG = 1,
-    DEFAULT_FILL,
+    ENUM_END,
 };
 
 struct RenderState {
