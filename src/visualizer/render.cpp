@@ -22,15 +22,10 @@ sl::exec::async<sl::game::shader>
 
     auto sp = *ASSERT_VAL(sl::gfx::shader_program::build(std::span{ shaders }));
     auto bound_sp = sp.bind();
-    auto set_transform =
+    auto set_transform [[maybe_unused]] =
         *ASSERT_VAL(bound_sp.make_uniform_matrix_v_setter(glUniformMatrix4fv, "u_transform", 1, false));
     auto set_mode = *ASSERT_VAL(bound_sp.make_uniform_setter(glUniform1ui, "u_mode"));
     auto set_window_size = *ASSERT_VAL(bound_sp.make_uniform_setter(glUniform2f, "u_window_size"));
-
-    {
-        const auto transform = glm::mat4(1.0f);
-        set_transform(bound_sp, glm::value_ptr(transform));
-    }
 
     sl::gfx::buffer<float, sl::gfx::buffer_type::shader_storage, sl::gfx::buffer_usage::dynamic_draw> ssbo;
     ssbo.bind().initialize_data(ssbo_size);
@@ -43,7 +38,7 @@ sl::exec::async<sl::game::shader>
                     ssbo = std::move(ssbo),
                     render_entity](
                     sl::ecs::layer& layer, //
-                    const sl::game::camera_frame& camera_frame [[maybe_unused]],
+                    const sl::game::camera_frame&,
                     const sl::gfx::bound_shader_program& bound_sp
                 ) mutable {
             if (auto* state = layer.registry.try_get<RenderState>(render_entity)) {
@@ -62,14 +57,13 @@ sl::exec::async<sl::game::shader>
                 });
             }
 
-            return [&, bound_ssbo = ssbo.bind_base(0)](
-                       const sl::gfx::bound_vertex_array& bound_va,
-                       sl::game::vertex::draw_type& vertex_draw,
-                       std::span<const entt::entity> entities
-                   ) {
-                sl::gfx::draw draw{ bound_sp, bound_va };
-                vertex_draw(draw);
-            };
+            return [&, bound_ssbo = ssbo.bind_base(0)] //
+                (const sl::gfx::bound_vertex_array& bound_va,
+                 sl::game::vertex::draw_type& vertex_draw,
+                 std::span<const entt::entity>) {
+                    sl::gfx::draw draw{ bound_sp, bound_va };
+                    vertex_draw(draw);
+                };
         } },
     };
 }
