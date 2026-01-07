@@ -10,8 +10,15 @@
 #include <sl/rt.hpp>
 
 #include <libassert/assert.hpp>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 int main(int argc, char** argv) {
+    auto a_logger = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    sl::game::logger().set_level(spdlog::level::debug);
+    sl::game::logger().sinks().push_back(a_logger);
+    sl::gfx::logger().set_level(spdlog::level::debug);
+    sl::gfx::logger().sinks().push_back(a_logger);
+
     const glm::ivec2 window_size{ 1280, 720 };
     auto w_ctx = *ASSERT_VAL(sl::game::window_context::initialize(
         sl::meta::null, "serious-music-visualizer", window_size, { 0.1f, 0.1f, 0.1f, 0.1f }

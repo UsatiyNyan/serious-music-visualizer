@@ -99,7 +99,7 @@ sl::exec::async<entt::entity>
         RenderState{
             .normalized_freq_proc_output{},
             .window_size{ static_cast<glm::fvec2>(window_size) },
-            .draw_mode{ DrawMode::RADIUS_LOG },
+            .draw_mode{ DrawMode::RAY_MARCHING },
         }
     );
     std::ignore = e_ctx.w_ctx.window->frame_buffer_size_cb.connect([&layer, entity](glm::ivec2 frame_buffer_size) {
@@ -115,16 +115,20 @@ sl::exec::async<entt::entity>
 
                 constexpr auto draw_mode_to_str = [](DrawMode draw_mode) {
                     switch (draw_mode) {
+                    case DrawMode::DEFAULT_FILL:
+                        return "default fill";
                     case DrawMode::RADIUS_LINEAR:
                         return "radius linear";
                     case DrawMode::RADIUS_LOG:
                         return "radius log";
+                    case DrawMode::RAY_MARCHING:
+                        return "ray marching";
                     default:
                         break;
                     }
-                    return "default";
+                    return "not implemented";
                 };
-                const auto preview_draw_mode = state.draw_mode.get().map(draw_mode_to_str).value_or("");
+                const auto preview_draw_mode = state.draw_mode.get().map(draw_mode_to_str).value_or("none");
 
                 if (ImGui::BeginCombo("draw mode", preview_draw_mode)) {
                     for (DrawMode draw_mode{}; draw_mode != DrawMode::ENUM_END; draw_mode = sl::meta::next(draw_mode)) {
