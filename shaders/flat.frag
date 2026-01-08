@@ -33,15 +33,12 @@ vec4 draw_radius(vec2 uv, float radius, bool is_logspace) {
     return vec4(mix(color_a, color_b, color_coef), alpha);
 }
 
-float rm_sd_sphere(vec3 p, vec3 c, float r) {
-    return length(p - c) - r;
-}
-
 const uint rm_TYPE_NONE = 0;
 const uint rm_TYPE_REFLECT = 1;
 const uint rm_TYPE_SOLID = 2;
-const uint rm_TYPE_NORMAL = 3;
-const uint rm_TYPE_DISTANCE = 4;
+const uint rm_TYPE_SHADE = 3;
+const uint rm_TYPE_NORMAL = 4;
+const uint rm_TYPE_DISTANCE = 5;
 struct rm_MO {
     vec3 c; // color
     float d; // distance
@@ -50,14 +47,15 @@ struct rm_MO {
 
 const float rm_MIN_DISTANCE = 0.001;
 const float rm_MAX_DISTANCE = 1000.0;
+const float rm_SMOOTHING = 0.1;
 
 float rm_smooth_min(float a, float b, float k) {
     float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
     return mix(b, a, h) - k * h * (1.0 - h);
 }
 
-void rm_union_smooth(inout rm_MO mo, float d, vec3 c, uint t) {
-    const float k = 0.1;
+void rm_smooth_union(inout rm_MO mo, float d, vec3 c, uint t) {
+    const float k = rm_SMOOTHING;
     const bool wins = d < mo.d;
     mo.d = rm_smooth_min(mo.d, d, k);
     if (wins) {
@@ -66,18 +64,47 @@ void rm_union_smooth(inout rm_MO mo, float d, vec3 c, uint t) {
     }
 }
 
+vec3 rm_twist(vec3 p, float k) {
+    const float c = cos(k * p.y);
+    const float s = sin(k * p.y);
+    const mat2 m = mat2(c, -s, s, c);
+    const vec3 q = vec3(m * p.xz, p.y);
+    return q;
+}
+
+float rm_sd_sphere(vec3 p, vec3 c, float r) {
+    return length(p - c) - r;
+}
+
+float rm_sd_torus(vec3 p, vec2 t)
+{
+    vec2 q = vec2(length(p.xz) - t.x, p.y);
+    return length(q) - t.y;
+}
+
 rm_MO rm_map_the_world(vec3 p) {
     rm_MO mo;
     mo.d = rm_MAX_DISTANCE;
 
-    const float sphere_0 = rm_sd_sphere(p, vec3(1.0, 0.0, 0.0), 1.0);
-    rm_union_smooth(mo, sphere_0, vec3(1.0, 0.0, 0.0), rm_TYPE_SOLID);
+    // {
+    //     const float sphere = rm_sd_sphere(p, vec3(1.0, 0.0, 0.0), 1.0);
+    //     rm_smooth_union(mo, sphere, vec3(1.0, 0.0, 0.0), rm_TYPE_SOLID);
+    // }
+    //
+    // {
+    //     const float sphere = rm_sd_sphere(p, vec3(-1.0, 0.0, 0.0), 1.0);
+    //     rm_smooth_union(mo, sphere, vec3(0.0, 1.0, 0.0), rm_TYPE_SOLID);
+    // }
 
-    const float sphere_1 = rm_sd_sphere(p, vec3(-1.0, 0.0, 0.0), 1.0);
-    rm_union_smooth(mo, sphere_1, vec3(0.0, 1.0, 0.0), rm_TYPE_SOLID);
+    {
+        const float sphere = rm_sd_sphere(p, vec3(0.0, 0.0, 0.0), 1.0);
+        rm_smooth_union(mo, sphere, vec3(0.0), rm_TYPE_REFLECT);
+    }
 
-    const float sphere_2 = rm_sd_sphere(p, vec3(0.0, 2.0, 0.0), 1.0);
-    rm_union_smooth(mo, sphere_2, vec3(0.0), rm_TYPE_REFLECT);
+    {
+        const float torus = rm_sd_torus(rm_twist(p, 1.0), vec2(4.0, 1.0));
+        rm_smooth_union(mo, torus, vec3(0.7, 0.1, 0.25), rm_TYPE_SOLID);
+    }
 
     return mo;
 }
@@ -113,12 +140,12 @@ vec3 rm_ray_march(vec3 ray_origin, vec3 ray_direction) {
     const uint MAX_BOUNCES = 8;
     const float ANGULAR_SPEED = 0.3;
 
-    const vec3 light_position = vec3(2.0, -5.0, 3.0);
-
     const mat2 rotation = rm_rot_mat_2d(u_time * ANGULAR_SPEED);
     const mat2 inverse_rotation = transpose(rotation);
     ray_origin = rm_rot_xz_by(ray_origin, inverse_rotation);
     ray_direction = rm_rot_xz_by(ray_direction, inverse_rotation);
+
+    const vec3 light_position = vec3(0.0, 10.0, 10.0);
 
     float distance_traveled = 0.0;
     for (uint step_count = 0; step_count < MAX_STEPS; ++step_count) { // render loop
@@ -138,6 +165,10 @@ vec3 rm_ray_march(vec3 ray_origin, vec3 ray_direction) {
                     break;
                 }
                 case rm_TYPE_SOLID:
+                {
+                    return closest_obj.c;
+                }
+                case rm_TYPE_SHADE:
                 {
                     const vec3 direction_to_light = normalize(current_position - light_position);
                     const vec3 normal = rm_calculate_normal(current_position);
@@ -168,7 +199,7 @@ vec3 rm_ray_march(vec3 ray_origin, vec3 ray_direction) {
 }
 
 vec4 draw_ray_marching(vec2 uv) {
-    const vec3 ray_origin = vec3(0.0, 0.0, -5.0);
+    const vec3 ray_origin = vec3(0.0, 0.0, -10.0);
     const vec3 ray_direction = vec3(uv, 1.0);
 
     const vec3 shaded_color = rm_ray_march(ray_origin, ray_direction);
