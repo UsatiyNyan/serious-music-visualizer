@@ -3,6 +3,7 @@
 out vec4 frag_color;
 
 uniform uint u_mode;
+uniform float u_time = 0;
 uniform vec2 u_window_size;
 
 layout(std430, binding = 0) readonly buffer normalized_freq_domain_output {
@@ -55,13 +56,8 @@ float rm_smooth_min(float a, float b, float k) {
     return mix(b, a, h) - k * h * (1.0 - h);
 }
 
-void rm_union_smooth(
-    inout rm_MO mo,
-    float d,
-    vec3 c,
-    uint t
-) {
-    const float k = 0.3;
+void rm_union_smooth(inout rm_MO mo, float d, vec3 c, uint t) {
+    const float k = 0.1;
     const bool wins = d < mo.d;
     mo.d = rm_smooth_min(mo.d, d, k);
     if (wins) {
@@ -70,7 +66,6 @@ void rm_union_smooth(
     }
 }
 
-// TODO:
 rm_MO rm_map_the_world(vec3 p) {
     rm_MO mo;
     mo.d = rm_MAX_DISTANCE;
@@ -78,8 +73,11 @@ rm_MO rm_map_the_world(vec3 p) {
     const float sphere_0 = rm_sd_sphere(p, vec3(1.0, 0.0, 0.0), 1.0);
     rm_union_smooth(mo, sphere_0, vec3(1.0, 0.0, 0.0), rm_TYPE_SOLID);
 
-    const float sphere_1 = rm_sd_sphere(p, vec3(0.0, 0.0, 0.0), 1.0);
-    rm_union_smooth(mo, sphere_1, vec3(0.0), rm_TYPE_DISTANCE);
+    const float sphere_1 = rm_sd_sphere(p, vec3(-1.0, 0.0, 0.0), 1.0);
+    rm_union_smooth(mo, sphere_1, vec3(0.0, 1.0, 0.0), rm_TYPE_SOLID);
+
+    const float sphere_2 = rm_sd_sphere(p, vec3(0.0, 2.0, 0.0), 1.0);
+    rm_union_smooth(mo, sphere_2, vec3(0.0), rm_TYPE_REFLECT);
 
     return mo;
 }
@@ -96,11 +94,31 @@ vec3 rm_calculate_normal(in vec3 p)
     return normalize(vec3(gradient_x, gradient_y, gradient_z));
 }
 
+mat2 rm_rot_mat_2d(float angle) {
+    const float s = sin(angle);
+    const float c = cos(angle);
+    return mat2(
+        c, -s,
+        s, c
+    );
+}
+
+vec3 rm_rot_xz_by(vec3 p, mat2 r) {
+    p.xz *= r;
+    return p;
+}
+
 vec3 rm_ray_march(vec3 ray_origin, vec3 ray_direction) {
     const uint MAX_STEPS = 32;
     const uint MAX_BOUNCES = 8;
+    const float ANGULAR_SPEED = 0.3;
 
     const vec3 light_position = vec3(2.0, -5.0, 3.0);
+
+    const mat2 rotation = rm_rot_mat_2d(u_time * ANGULAR_SPEED);
+    const mat2 inverse_rotation = transpose(rotation);
+    ray_origin = rm_rot_xz_by(ray_origin, inverse_rotation);
+    ray_direction = rm_rot_xz_by(ray_direction, inverse_rotation);
 
     float distance_traveled = 0.0;
     for (uint step_count = 0; step_count < MAX_STEPS; ++step_count) { // render loop
@@ -113,9 +131,10 @@ vec3 rm_ray_march(vec3 ray_origin, vec3 ray_direction) {
                 break;
                 case rm_TYPE_REFLECT:
                 {
-                    ray_direction = reflect(ray_direction, rm_calculate_normal(current_position));
-                    ray_origin = current_position;
-                    distance_traveled += 0.1; // offset to prevent the ray being "trapped" within the collision.
+                    const vec3 normal = rm_calculate_normal(current_position);
+                    ray_direction = reflect(ray_direction, normal);
+                    ray_origin = current_position + normal * rm_MIN_DISTANCE * 2.0;
+                    distance_traveled = 0.1;
                     break;
                 }
                 case rm_TYPE_SOLID:

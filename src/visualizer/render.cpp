@@ -25,6 +25,7 @@ sl::exec::async<sl::game::shader>
     auto set_transform [[maybe_unused]] =
         *ASSERT_VAL(bound_sp.make_uniform_matrix_v_setter(glUniformMatrix4fv, "u_transform", 1, false));
     auto set_mode = *ASSERT_VAL(bound_sp.make_uniform_setter(glUniform1ui, "u_mode"));
+    auto set_time = *ASSERT_VAL(bound_sp.make_uniform_setter(glUniform1f, "u_time"));
     auto set_window_size = *ASSERT_VAL(bound_sp.make_uniform_setter(glUniform2f, "u_window_size"));
 
     sl::gfx::buffer<float, sl::gfx::buffer_type::shader_storage, sl::gfx::buffer_usage::dynamic_draw> ssbo;
@@ -34,6 +35,7 @@ sl::exec::async<sl::game::shader>
         .sp{ std::move(sp) },
         .setup{ [ //
                     set_mode = std::move(set_mode),
+                    set_time = std::move(set_time),
                     set_window_size = std::move(set_window_size),
                     ssbo = std::move(ssbo),
                     render_entity](
@@ -55,6 +57,7 @@ sl::exec::async<sl::game::shader>
                 state->draw_mode.release().map([&](DrawMode draw_mode) {
                     set_mode(bound_sp, static_cast<GLuint>(draw_mode));
                 });
+                state->time.release().map([&](float time) { set_time(bound_sp, time); });
             }
 
             return [&, bound_ssbo = ssbo.bind_base(0)] //
@@ -100,6 +103,7 @@ sl::exec::async<entt::entity>
             .normalized_freq_proc_output{},
             .window_size{ static_cast<glm::fvec2>(window_size) },
             .draw_mode{ DrawMode::RAY_MARCHING },
+            .time{},
         }
     );
     std::ignore = e_ctx.w_ctx.window->frame_buffer_size_cb.connect([&layer, entity](glm::ivec2 frame_buffer_size) {
@@ -139,6 +143,13 @@ sl::exec::async<entt::entity>
                     ImGui::EndCombo();
                 }
             }
+        }
+    );
+    layer.registry.emplace<sl::game::update>(
+        entity,
+        [](sl::ecs::layer& layer, entt::entity entity, sl::game::time_point time_point) {
+            auto& state = layer.registry.get<RenderState>(entity);
+            state.time.set(time_point.delta_from_init_sec().count());
         }
     );
 

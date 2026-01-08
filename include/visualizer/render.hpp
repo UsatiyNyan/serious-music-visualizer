@@ -37,6 +37,7 @@ struct RenderState {
     sl::meta::dirty<std::vector<float>> normalized_freq_proc_output;
     sl::meta::dirty<glm::fvec2> window_size;
     sl::meta::dirty<DrawMode> draw_mode;
+    sl::meta::dirty<float> time;
 };
 
 sl::exec::async<sl::game::shader>
