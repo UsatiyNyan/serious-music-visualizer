@@ -25,6 +25,8 @@ struct AudioState {
         std::vector<std::complex<float>> half_freq_domain;
         std::vector<float> abs_half_freq_domain;
         std::vector<float> log_abs_half_freq_domain;
+        std::vector<float> normalized_freq_domain_output;
+        float sound_level = 0.0f;
     } intermediate;
 
     struct Device {
@@ -49,7 +51,8 @@ void audio_update_process(
     const audio::DataConfig& config,
     sl::ecs::layer& layer,
     entt::entity render_entity,
-    AudioState& audio_state
+    AudioState& audio_state,
+    sl::game::time_point time_point
 );
 
 void audio_update_device(const audio::DataConfig& config, AudioState& audio_state);

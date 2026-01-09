@@ -4,6 +4,8 @@
 
 #include "visualizer/render.hpp"
 
+#include <glm/gtc/type_ptr.hpp>
+#include <imgui.h>
 #include <sl/game/graphics/buffer.hpp>
 #include <sl/meta/enum/to_string.hpp>
 
@@ -27,6 +29,9 @@ sl::exec::async<sl::game::shader>
     auto set_mode = *ASSERT_VAL(bound_sp.make_uniform_setter(glUniform1ui, "u_mode"));
     auto set_time = *ASSERT_VAL(bound_sp.make_uniform_setter(glUniform1f, "u_time"));
     auto set_window_size = *ASSERT_VAL(bound_sp.make_uniform_setter(glUniform2f, "u_window_size"));
+    auto set_ray_origin = *ASSERT_VAL(bound_sp.make_uniform_setter(glUniform3f, "u_ray_origin"));
+    auto set_ray_pitch = *ASSERT_VAL(bound_sp.make_uniform_setter(glUniform1f, "u_ray_pitch"));
+    auto set_sound_level = *ASSERT_VAL(bound_sp.make_uniform_setter(glUniform1f, "u_sound_level"));
 
     sl::gfx::buffer<float, sl::gfx::buffer_type::shader_storage, sl::gfx::buffer_usage::dynamic_draw> ssbo;
     ssbo.bind().initialize_data(ssbo_size);
@@ -38,6 +43,9 @@ sl::exec::async<sl::game::shader>
                     set_time = std::move(set_time),
                     set_window_size = std::move(set_window_size),
                     ssbo = std::move(ssbo),
+                    set_ray_origin = std::move(set_ray_origin),
+                    set_ray_pitch = std::move(set_ray_pitch),
+                    set_sound_level = std::move(set_sound_level),
                     render_entity](
                     sl::ecs::layer& layer, //
                     const sl::game::camera_frame&,
@@ -58,6 +66,11 @@ sl::exec::async<sl::game::shader>
                     set_mode(bound_sp, static_cast<GLuint>(draw_mode));
                 });
                 state->time.release().map([&](float time) { set_time(bound_sp, time); });
+                state->ray_origin.release().map([&](const glm::fvec3& ray_origin) {
+                    set_ray_origin(bound_sp, ray_origin);
+                });
+                state->ray_pitch.release().map([&](float ray_pitch) { set_ray_pitch(bound_sp, ray_pitch); });
+                state->sound_level.release().map([&](float sound_level) { set_sound_level(bound_sp, sound_level); });
             }
 
             return [&, bound_ssbo = ssbo.bind_base(0)] //
@@ -101,9 +114,12 @@ sl::exec::async<entt::entity>
         entity,
         RenderState{
             .normalized_freq_proc_output{},
+            .ray_origin{ glm::fvec3{ 0.0f, 3.9f, -4.0f } },
             .window_size{ static_cast<glm::fvec2>(window_size) },
             .draw_mode{ DrawMode::RAY_MARCHING },
             .time{},
+            .ray_pitch{ 0.26f },
+            .sound_level{},
         }
     );
     std::ignore = e_ctx.w_ctx.window->frame_buffer_size_cb.connect([&layer, entity](glm::ivec2 frame_buffer_size) {
@@ -141,6 +157,16 @@ sl::exec::async<entt::entity>
                         }
                     }
                     ImGui::EndCombo();
+                }
+
+                glm::vec3 ray_origin = state.ray_origin.get().value_or(glm::vec3{});
+                if (ImGui::SliderFloat3("ray_origin", glm::value_ptr(ray_origin), -10.0f, 10.0f)) {
+                    state.ray_origin.set_if_ne(ray_origin);
+                }
+
+                float pitch = state.ray_pitch.get().value_or(0.0f);
+                if (ImGui::SliderFloat("pitch", &pitch, -1.0f, 1.0f)) {
+                    state.ray_pitch.set_if_ne(pitch);
                 }
             }
         }

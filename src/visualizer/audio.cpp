@@ -48,9 +48,9 @@ sl::exec::async<entt::entity> create_audio_entity(
     spdlog::info("selected backend={}", audio_state.context.backend_name());
     layer.registry.emplace<sl::game::update>(
         entity,
-        [&config, render_entity](sl::ecs::layer& layer, entt::entity entity, sl::game::time_point) {
+        [&config, render_entity](sl::ecs::layer& layer, entt::entity entity, sl::game::time_point time_point) {
             auto& audio_state = layer.registry.get<AudioState>(entity);
-            audio_update_process(config, layer, render_entity, audio_state);
+            audio_update_process(config, layer, render_entity, audio_state, time_point);
             audio_update_device(config, audio_state);
         }
     );
@@ -68,7 +68,8 @@ void audio_update_process(
     const audio::DataConfig& config,
     sl::ecs::layer& layer,
     entt::entity render_entity,
-    AudioState& audio_state
+    AudioState& audio_state,
+    sl::game::time_point time_point
 ) {
     namespace r = ranges;
     namespace rv = r::views;
@@ -83,6 +84,14 @@ void audio_update_process(
     if (audio_state.intermediate.time_domain.size() != config.frame_count) {
         return;
     }
+
+    {
+        const auto& td = audio_state.intermediate.time_domain;
+        const float rms = std::accumulate(td.begin(), td.end(), 0.0f, [](float acc, std::complex<float> x) {
+            return acc + (std::abs(x));
+        });
+    }
+
 
     // CALCULATE FFT (TIME DOMAIN -> FREQ DOMAIN)
     audio_state.intermediate.freq_domain = sl::calc::fft<sl::calc::fourier::direction::time_to_freq>(
@@ -102,12 +111,39 @@ void audio_update_process(
                                                         | rv::transform([](float x) { return std::log(x); }) //
                                                         | r::to<std::vector>();
 
+    const float N = static_cast<float>(audio_state.intermediate.freq_domain.size());
+    const float normalize_by = std::log(N);
+    audio_state.intermediate.normalized_freq_domain_output =
+        audio_state.intermediate.log_abs_half_freq_domain //
+        | rv::transform([normalize_by](float value) { return value / normalize_by; }) //
+        | r::to<std::vector>();
+
+    // thanks Freya Holmer <3
+    constexpr auto exp_decay = [](float a, float b, float decay, float dt) -> float {
+        return b + (a - b) * std::exp(-decay * dt);
+    };
+    constexpr float decay = 16;
+
+    {
+        const float abs_acc = std::accumulate(
+            audio_state.intermediate.normalized_freq_domain_output.begin(),
+            audio_state.intermediate.normalized_freq_domain_output.end(),
+            0.0f,
+            [](float acc, float x) { return acc + ((x + 1.0f) / 2.0f); }
+        );
+        const float abs_acc_over_N = abs_acc / N;
+        const float abs_acc_over_N_clamped = std::clamp(abs_acc_over_N, 0.0f, 1.0f);
+        audio_state.intermediate.sound_level = exp_decay( //
+            audio_state.intermediate.sound_level,
+            abs_acc_over_N_clamped,
+            decay,
+            time_point.delta_sec().count()
+        );
+    }
+
     if (auto* render_state = layer.registry.try_get<RenderState>(render_entity)) {
-        const auto normalize_by = std::log(static_cast<float>(audio_state.intermediate.freq_domain.size()));
-        auto normalized_output = audio_state.intermediate.log_abs_half_freq_domain
-                                 | rv::transform([normalize_by](float value) { return value / normalize_by; })
-                                 | r::to<std::vector>();
-        render_state->normalized_freq_proc_output.set(std::move(normalized_output));
+        render_state->normalized_freq_proc_output.set(audio_state.intermediate.normalized_freq_domain_output);
+        render_state->sound_level.set_if_ne(audio_state.intermediate.sound_level);
     }
 }
 
@@ -230,6 +266,7 @@ void audio_overlay(
         ImGui::SetWindowPos(debug_window_pos);
 
         ImGui::Text("FPS: %.1f", static_cast<double>(ImGui::GetIO().Framerate));
+        ImGui::Text("sound level: %.3f", static_cast<double>(audio_state.intermediate.sound_level));
 
         if (ImPlot::BeginPlot("log_abs_half_freq_domain", ImVec2{ -1.0f, 300.0f })) {
             const auto& vec = audio_state.intermediate.log_abs_half_freq_domain;

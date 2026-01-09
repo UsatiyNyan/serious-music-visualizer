@@ -5,28 +5,40 @@ out vec4 frag_color;
 uniform uint u_mode;
 uniform float u_time = 0;
 uniform vec2 u_window_size;
+uniform vec3 u_ray_origin;
+uniform float u_ray_pitch;
+uniform float u_sound_level = 0; // [0, 1]
+
+#define M_PI 3.1415926535897932384626433832795
+
+const uint nfdo_N = 1024;
 
 layout(std430, binding = 0) readonly buffer normalized_freq_domain_output {
-    float data[1024];
+    float data[nfdo_N];
 } nfdo;
 
 vec4 default_fill() {
     return vec4(1.0f, 0.5f, 0.2f, 1.0f);
 }
 
-float logspace(uint index, uint N) {
-    const float logN = log(float(N));
-    return exp(float(index) * logN / float(N - 1));
+const float nfdo_logN = log(float(nfdo_N));
+float logspace(float v) {
+    return exp(v * nfdo_logN) / float(nfdo_N);
 }
 
-float color_coef(uint index, uint N) {
-    return index < N ? nfdo.data[index] : 0.0f;
+float nfdo_at(uint index) {
+    return index < nfdo_N ? clamp(nfdo.data[index], -1.0, 1.0) : 0.0;
+}
+
+float nfdo_at_smoothed(float v) {
+    const float u = v * float(nfdo_N);
+    const uint i = uint(int(floor(u)));
+    return mix(nfdo_at(i), nfdo_at(i + 1u), fract(u));
 }
 
 vec4 draw_radius(vec2 uv, float radius, bool is_logspace) {
-    const uint N = 1024;
-    const uint index = uint(length(uv) / radius * N);
-    const float color_coef = color_coef(is_logspace ? uint(logspace(index, N)) : index, N);
+    const float v = length(uv) / radius;
+    const float color_coef = nfdo_at_smoothed(is_logspace ? logspace(v) : v);
     const vec3 color_a = vec3(0.0f, 0.0f, 0.0f);
     const vec3 color_b = vec3(0.5f, 0.0f, 0.5f);
     const float alpha = 1.0f;
@@ -46,7 +58,7 @@ struct rm_MO {
 };
 
 const float rm_MIN_DISTANCE = 0.001;
-const float rm_MAX_DISTANCE = 1000.0;
+const float rm_MAX_DISTANCE = 10000.0;
 const float rm_SMOOTHING = 0.1;
 
 float rm_smooth_min(float a, float b, float k) {
@@ -76,34 +88,46 @@ float rm_sd_sphere(vec3 p, vec3 c, float r) {
     return length(p - c) - r;
 }
 
-float rm_sd_torus(vec3 p, vec2 t)
-{
-    vec2 q = vec2(length(p.xz) - t.x, p.y);
-    return length(q) - t.y;
+float rm_sd_torus(vec3 p, vec3 c, float R, float r) {
+    const vec3 d = p - c;
+    const vec2 q = vec2(length(d.xz) - R, d.y);
+    return length(q) - r;
+}
+
+float rm_sd_disk(vec3 p, float radius) {
+    return max(length(p.xz) - radius, abs(p.y));
 }
 
 rm_MO rm_map_the_world(vec3 p) {
     rm_MO mo;
     mo.d = rm_MAX_DISTANCE;
-
-    // {
-    //     const float sphere = rm_sd_sphere(p, vec3(1.0, 0.0, 0.0), 1.0);
-    //     rm_smooth_union(mo, sphere, vec3(1.0, 0.0, 0.0), rm_TYPE_SOLID);
-    // }
-    //
-    // {
-    //     const float sphere = rm_sd_sphere(p, vec3(-1.0, 0.0, 0.0), 1.0);
-    //     rm_smooth_union(mo, sphere, vec3(0.0, 1.0, 0.0), rm_TYPE_SOLID);
-    // }
+    mo.t = rm_TYPE_NONE;
 
     {
-        const float sphere = rm_sd_sphere(p, vec3(0.0, 0.0, 0.0), 1.0);
+        const vec3 c = vec3(0.0, 2.0 + sin(u_time * 0.3), 0.0);
+        const float sphere = rm_sd_sphere(p, c, 0.5);
         rm_smooth_union(mo, sphere, vec3(0.0), rm_TYPE_REFLECT);
     }
 
     {
-        const float torus = rm_sd_torus(rm_twist(p, 1.0), vec2(4.0, 1.0));
+        const float torus = rm_sd_torus(rm_twist(p, u_sound_level * 4), vec3(0.0), 8.0, 1.0);
         rm_smooth_union(mo, torus, vec3(0.7, 0.1, 0.25), rm_TYPE_SOLID);
+    }
+
+    {
+        const float R = 4.0;
+        const float r = 0.1;
+        const float ypos = -0.5;
+        const float pr = length(p.xz);
+        if (pr <= R) {
+            const float v = clamp(pr / R, 0.0, 1.0);
+            const float logspace_v = logspace(v);
+            const float nfdo_value = nfdo_at_smoothed(logspace_v); // [-1, 1] 
+            const float h = (nfdo_value + 1) / 2; // [0, 1]
+            const float puddle_torus = rm_sd_torus(p, vec3(0.0, h - ypos, 0.0), pr, r);
+            const vec3 color = mix(vec3(1.0, 0.0, 1.0), vec3(0.0, 1.0, 1.0), logspace_v);
+            rm_smooth_union(mo, puddle_torus, mix(vec3(0.0), color, h), rm_TYPE_SOLID);
+        }
     }
 
     return mo;
@@ -135,17 +159,38 @@ vec3 rm_rot_xz_by(vec3 p, mat2 r) {
     return p;
 }
 
+mat3 rm_rot_x(float a) {
+    float s = sin(a);
+    float c = cos(a);
+    return mat3(
+        1.0, 0.0, 0.0,
+        0.0, c, -s,
+        0.0, s, c
+    );
+}
+
+mat3 rm_rot_y(float a) {
+    float s = sin(a);
+    float c = cos(a);
+    return mat3(
+        c, 0.0, s,
+        0.0, 1.0, 0.0,
+        -s, 0.0, c
+    );
+}
+
 vec3 rm_ray_march(vec3 ray_origin, vec3 ray_direction) {
     const uint MAX_STEPS = 32;
     const uint MAX_BOUNCES = 8;
     const float ANGULAR_SPEED = 0.3;
 
     const mat2 rotation = rm_rot_mat_2d(u_time * ANGULAR_SPEED);
+    // const mat2 rotation = rm_rot_mat_2d(0.0);
     const mat2 inverse_rotation = transpose(rotation);
     ray_origin = rm_rot_xz_by(ray_origin, inverse_rotation);
     ray_direction = rm_rot_xz_by(ray_direction, inverse_rotation);
 
-    const vec3 light_position = vec3(0.0, 10.0, 10.0);
+    const vec3 light_position = vec3(0.0, 5.0, 0.0);
 
     float distance_traveled = 0.0;
     for (uint step_count = 0; step_count < MAX_STEPS; ++step_count) { // render loop
@@ -192,15 +237,15 @@ vec3 rm_ray_march(vec3 ray_origin, vec3 ray_direction) {
         if (distance_traveled > rm_MAX_DISTANCE) {
             break;
         }
-        distance_traveled += closest_obj.d;
+        distance_traveled += min(closest_obj.d, 0.5);;
     }
 
     return vec3(0.0);
 }
 
 vec4 draw_ray_marching(vec2 uv) {
-    const vec3 ray_origin = vec3(0.0, 0.0, -10.0);
-    const vec3 ray_direction = vec3(uv, 1.0);
+    const vec3 ray_origin = u_ray_origin;
+    const vec3 ray_direction = normalize(rm_rot_x(-(M_PI * u_ray_pitch)) * vec3(uv, 1.0));
 
     const vec3 shaded_color = rm_ray_march(ray_origin, ray_direction);
 
