@@ -268,13 +268,85 @@ void audio_overlay(
         ImGui::Text("FPS: %.1f", static_cast<double>(ImGui::GetIO().Framerate));
         ImGui::Text("sound level: %.3f", static_cast<double>(audio_state.intermediate.sound_level));
 
+        if (ImPlot::BeginPlot("time_domain", ImVec2{ -1.0f, 300.0f })) {
+            const auto& vec = audio_state.intermediate.time_domain;
+
+            ImPlot::SetupAxisLimits(ImAxis_X1, 0.0, static_cast<double>(vec.size()), ImPlotCond_Always);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, -1.0, 1.0, ImPlotCond_Always);
+
+            ImPlot::PlotLineG(
+                "f(t)",
+                [](int idx, void* data) {
+                    return ImPlotPoint{
+                        static_cast<double>(idx),
+                        static_cast<double>(static_cast<const std::complex<float>*>(data)[idx].real()),
+                    };
+                },
+                (void*)vec.data(),
+                static_cast<int>(vec.size())
+            );
+
+            ImPlot::EndPlot();
+        }
+
+        if (ImPlot::BeginPlot("freq_domain (abs)", ImVec2{ -1.0f, 300.0f })) {
+            const auto& vec = audio_state.intermediate.freq_domain;
+            const double log_max_amp = std::log(static_cast<double>(vec.size()));
+
+            ImPlot::SetupAxisLimits(ImAxis_X1, 0.0, static_cast<double>(vec.size()), ImPlotCond_Always);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, 0.0, log_max_amp, ImPlotCond_Always);
+
+            ImPlot::PlotLineG(
+                "|F(omega)|",
+                [](int idx, void* data) {
+                    return ImPlotPoint{
+                        static_cast<double>(idx),
+                        static_cast<double>(std::abs(static_cast<const std::complex<float>*>(data)[idx])),
+                    };
+                },
+                (void*)vec.data(),
+                static_cast<int>(vec.size())
+            );
+
+            ImPlot::EndPlot();
+        }
+
+        if (ImPlot::BeginPlot("abs_half_freq_domain", ImVec2{ -1.0f, 300.0f })) {
+            const auto& vec = audio_state.intermediate.abs_half_freq_domain;
+            const double log_max_amp = std::log(static_cast<double>(vec.size()));
+
+            ImPlot::SetupAxisLimits(ImAxis_X1, 0.0, static_cast<double>(vec.size()), ImPlotCond_Always);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, 0.0, log_max_amp, ImPlotCond_Always);
+
+            ImPlot::PlotLine("|F(omega)|, omega in [0..Omega/2)", vec.data(), static_cast<int>(vec.size()));
+
+            ImPlot::EndPlot();
+        }
+
         if (ImPlot::BeginPlot("log_abs_half_freq_domain", ImVec2{ -1.0f, 300.0f })) {
             const auto& vec = audio_state.intermediate.log_abs_half_freq_domain;
             const double log_max_amp = std::log(static_cast<double>(vec.size()));
+
             ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
             ImPlot::SetupAxisLimits(ImAxis_X1, 1.0, static_cast<double>(vec.size()), ImPlotCond_Always);
             ImPlot::SetupAxisLimits(ImAxis_Y1, -log_max_amp, log_max_amp, ImPlotCond_Always);
-            ImPlot::PlotLine("map (log abs) (F omega)", vec.data(), static_cast<int>(vec.size()));
+
+            ImPlot::PlotLine("ln |F(omega)|, omega in [0..Omega/2)", vec.data(), static_cast<int>(vec.size()));
+
+            ImPlot::EndPlot();
+        }
+
+        if (ImPlot::BeginPlot("normalized_freq_domain_output", ImVec2{ -1.0f, 300.0f })) {
+            const auto& vec = audio_state.intermediate.normalized_freq_domain_output;
+
+            ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
+            ImPlot::SetupAxisLimits(ImAxis_X1, 1.0, static_cast<double>(vec.size()), ImPlotCond_Always);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, -1.0, 1.0, ImPlotCond_Always);
+
+            ImPlot::PlotLine(
+                "ln |F(omega)| / ln Omega, omega in [0..Omega/2)", vec.data(), static_cast<int>(vec.size())
+            );
+
             ImPlot::EndPlot();
         }
     }
