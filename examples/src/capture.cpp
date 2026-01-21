@@ -5,7 +5,7 @@
 #include "miniaudio/miniaudio.hpp"
 
 #include <fmt/format.h>
-#include <libassert/assert.hpp>
+#include <sl/meta/assert.hpp>
 
 #include <atomic>
 #include <chrono>

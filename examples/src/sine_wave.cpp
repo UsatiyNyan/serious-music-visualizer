@@ -5,7 +5,7 @@
 #include "miniaudio/miniaudio.hpp"
 
 #include <fmt/format.h>
-#include <libassert/assert.hpp>
+#include <sl/meta/assert.hpp>
 
 int main() {
     const ma_context_config context_config = ma_context_config_init();

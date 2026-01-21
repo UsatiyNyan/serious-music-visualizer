@@ -4,14 +4,14 @@
 
 #include "audio/context.hpp"
 
-#include <libassert/assert.hpp>
 #include <miniaudio/miniaudio.hpp>
+#include <sl/meta/assert.hpp>
 #include <spdlog/spdlog.h>
 
 namespace audio {
 
 Context::Context(const std::vector<ma_backend>& backends, ma_context_config context_config)
-    : context_{ *ASSERT_VAL(ma::context_init(backends, add_logging(context_config, log_)), backends) } {
+    : context_{ *ASSERT_VAL(ma::context_init(backends, add_logging(context_config, log_))) } {
     auto [playback_infos, capture_infos] = *ASSERT_VAL(ma::context_get_devices(context_));
     playback_infos_ = playback_infos;
     capture_infos_ = capture_infos;

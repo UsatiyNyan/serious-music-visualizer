@@ -7,7 +7,7 @@
 #include "miniaudio/miniaudio.hpp"
 
 #include <fmt/format.h>
-#include <libassert/assert.hpp>
+#include <sl/meta/assert.hpp>
 #include <range/v3/view/enumerate.hpp>
 
 #include <atomic>

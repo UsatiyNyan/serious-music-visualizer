@@ -9,7 +9,7 @@
 #include <sl/game.hpp>
 #include <sl/rt.hpp>
 
-#include <libassert/assert.hpp>
+#include <sl/meta/assert.hpp>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 int main(int argc, char** argv) {

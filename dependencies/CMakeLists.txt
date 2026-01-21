@@ -2,11 +2,11 @@
 cpmaddpackage(
         NAME serious-game-library
         GIT_REPOSITORY "git@github.com:UsatiyNyan/serious-game-library.git"
-        GIT_TAG 0.0.6)
+        GIT_TAG 0.1.0)
 cpmaddpackage(
         NAME serious-calculation-library
         GIT_REPOSITORY "git@github.com:UsatiyNyan/serious-calculation-library.git"
-        GIT_TAG 0.0.0)
+        GIT_TAG 0.0.1)
 
 # Manually compiled
 add_subdirectory(miniaudio)
