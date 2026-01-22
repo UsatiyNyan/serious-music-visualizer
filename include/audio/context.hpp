@@ -22,7 +22,7 @@ struct Context {
 
 public:
     explicit Context(
-        const std::vector<ma_backend>& backends = { ma_backend_pulseaudio, ma_backend_wasapi },
+        const std::vector<ma_backend>& backends = { ma_backend_pulseaudio, ma_backend_coreaudio, ma_backend_wasapi },
         ma_context_config context_config = ma_context_config_init()
     );
 
