@@ -1,5 +1,9 @@
 # CMake packages
 cpmaddpackage(
+        NAME serious-graphics-library
+        GIT_REPOSITORY "git@github.com:UsatiyNyan/serious-graphics-library.git"
+        GIT_TAG 0.2.0)
+cpmaddpackage(
         NAME serious-game-library
         GIT_REPOSITORY "git@github.com:UsatiyNyan/serious-game-library.git"
         GIT_TAG 0.1.0)

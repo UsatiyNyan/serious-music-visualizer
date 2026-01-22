@@ -21,7 +21,10 @@ int main(int argc, char** argv) {
 
     const glm::ivec2 window_size{ 1280, 720 };
     auto w_ctx = *ASSERT_VAL(sl::game::window_context::initialize(
-        sl::meta::null, "serious-music-visualizer", window_size, { 0.1f, 0.1f, 0.1f, 0.1f }
+        sl::gfx::context::options{ 3, 3, GLFW_OPENGL_CORE_PROFILE },
+        "serious-music-visualizer",
+        window_size,
+        { 0.1f, 0.1f, 0.1f, 0.1f }
     ));
     auto e_ctx = sl::game::engine_context::initialize(std::move(w_ctx), argc, argv);
     sl::ecs::layer layer{};

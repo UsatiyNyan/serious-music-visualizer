@@ -33,8 +33,14 @@ sl::exec::async<sl::game::shader>
     auto set_ray_pitch = *ASSERT_VAL(bound_sp.make_uniform_setter(glUniform1f, "u_ray_pitch"));
     auto set_sound_level = *ASSERT_VAL(bound_sp.make_uniform_setter(glUniform1f, "u_sound_level"));
 
-    sl::gfx::buffer<float, sl::gfx::buffer_type::shader_storage, sl::gfx::buffer_usage::dynamic_draw> ssbo;
-    ssbo.bind().initialize_data(ssbo_size);
+    sl::gfx::buffer<float, sl::gfx::buffer_type::texture, sl::gfx::buffer_usage::dynamic_draw> tbo;
+    tbo.bind().initialize_data(ssbo_size);
+
+    sl::gfx::texture tex = [&tbo] {
+        sl::gfx::texture_builder builder{ sl::gfx::texture_type::texture_buffer };
+        builder.set_buffer(tbo, GL_R32F);
+        return std::move(builder).submit();
+    }();
 
     co_return sl::game::shader{
         .sp{ std::move(sp) },
@@ -42,7 +48,8 @@ sl::exec::async<sl::game::shader>
                     set_mode = std::move(set_mode),
                     set_time = std::move(set_time),
                     set_window_size = std::move(set_window_size),
-                    ssbo = std::move(ssbo),
+                    tbo = std::move(tbo),
+                    tex = std::move(tex),
                     set_ray_origin = std::move(set_ray_origin),
                     set_ray_pitch = std::move(set_ray_pitch),
                     set_sound_level = std::move(set_sound_level),
@@ -53,7 +60,7 @@ sl::exec::async<sl::game::shader>
                 ) mutable {
             if (auto* state = layer.registry.try_get<RenderState>(render_entity)) {
                 state->normalized_freq_proc_output.release().map([&](const std::vector<float>& output) {
-                    auto bound_ssbo = ssbo.bind();
+                    auto bound_ssbo = tbo.bind();
                     auto maybe_mapped_ssbo = bound_ssbo.template map<sl::gfx::buffer_access::write_only>();
                     auto mapped_ssbo = *ASSERT_VAL(std::move(maybe_mapped_ssbo));
                     auto mapped_ssbo_data = mapped_ssbo.data();
@@ -73,7 +80,7 @@ sl::exec::async<sl::game::shader>
                 state->sound_level.release().map([&](float sound_level) { set_sound_level(bound_sp, sound_level); });
             }
 
-            return [&, bound_ssbo = ssbo.bind_base(0)] //
+            return [&, bound_tex = tex.bind()] //
                 (const sl::gfx::bound_vertex_array& bound_va,
                  sl::game::vertex::draw_type& vertex_draw,
                  std::span<const entt::entity>) {
