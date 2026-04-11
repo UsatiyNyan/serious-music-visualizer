@@ -1,8 +1,7 @@
 cpmaddpackage(
         NAME miniaudio
         DOWNLOAD_ONLY
-        GIT_REPOSITORY "git@github.com:mackron/miniaudio.git"
-        GIT_TAG 0.11.23
+        URL https://github.com/mackron/miniaudio/archive/refs/tags/0.11.23.tar.gz
 )
 add_library(miniaudio-wrapper STATIC src/miniaudio.cpp)
 target_include_directories(miniaudio-wrapper

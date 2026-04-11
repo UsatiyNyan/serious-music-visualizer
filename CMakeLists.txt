@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.21)
 include(FetchContent)
 FetchContent_Declare(
         serious-cmake-library
-        GIT_REPOSITORY git@github.com:UsatiyNyan/serious-cmake-library.git
+        GIT_REPOSITORY https://github.com/UsatiyNyan/serious-cmake-library.git
         GIT_TAG main
 )
 FetchContent_MakeAvailable(serious-cmake-library)
@@ -16,7 +16,7 @@ sl_project_prologue(
 
 project(
         serious-music-visualizer
-        VERSION 2.0.2
+        VERSION 2.0.3
         DESCRIPTION "music visualizer"
         HOMEPAGE_URL "TODO"
         LANGUAGES C CXX)
