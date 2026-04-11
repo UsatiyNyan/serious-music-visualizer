@@ -47,16 +47,14 @@ sl::exec::async<entt::entity> create_audio_entity(
     );
     spdlog::info("selected backend={}", audio_state.context.backend_name());
     layer.registry.emplace<sl::game::update>(
-        entity,
-        [&config, render_entity](sl::ecs::layer& layer, entt::entity entity, sl::game::time_point time_point) {
+        entity, [config, render_entity](sl::ecs::layer& layer, entt::entity entity, sl::game::time_point time_point) {
             auto& audio_state = layer.registry.get<AudioState>(entity);
             audio_update_process(config, layer, render_entity, audio_state, time_point);
             audio_update_device(config, audio_state);
         }
     );
     layer.registry.emplace<sl::game::overlay>(
-        entity,
-        [&config](sl::ecs::layer& layer, sl::gfx::imgui_frame& imgui_frame, entt::entity entity) {
+        entity, [config](sl::ecs::layer& layer, sl::gfx::imgui_frame& imgui_frame, entt::entity entity) {
             audio_overlay(config, layer, imgui_frame, entity);
         }
     );
