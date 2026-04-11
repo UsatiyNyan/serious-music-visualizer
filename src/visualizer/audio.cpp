@@ -236,12 +236,18 @@ void audio_overlay(
             ImGui::EndCombo();
         }
 
-        const auto preview_capture_source = device_controls.index.get()
-                                                .map([&](std::size_t index) {
-                                                    const auto& capture_info = context.capture_infos()[index];
-                                                    return capture_info.name;
-                                                })
-                                                .value_or("");
+        const auto preview_capture_source = [&] -> const char* {
+            const auto dc_type = device_controls.type.get();
+            const auto dc_index = device_controls.index.get();
+            if (!dc_type.has_value() || !dc_index.has_value()) {
+                return "";
+            }
+            const auto& infos = dc_type.value() == ma_device_type_capture //
+                                    ? context.capture_infos()
+                                    : context.playback_infos();
+            return infos[dc_index.value()].name;
+        }();
+
         if (ImGui::BeginCombo("capture source", preview_capture_source)) {
             for (const auto& [index, capture_info] : ranges::views::enumerate(context.capture_infos())) {
                 if (ImGui::Selectable(capture_info.name)) {
