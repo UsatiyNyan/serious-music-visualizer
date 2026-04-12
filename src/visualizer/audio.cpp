@@ -236,24 +236,28 @@ void audio_overlay(
             ImGui::EndCombo();
         }
 
+        const auto maybe_infos = device_controls.type.get().map([&](auto dc_type) {
+            return dc_type == ma_device_type_capture //
+                       ? context.capture_infos()
+                       : context.playback_infos();
+        });
+
         const auto preview_capture_source = [&] -> const char* {
-            const auto dc_type = device_controls.type.get();
             const auto dc_index = device_controls.index.get();
-            if (!dc_type.has_value() || !dc_index.has_value()) {
+            if (!maybe_infos.has_value() || !dc_index.has_value()) {
                 return "";
             }
-            const auto& infos = dc_type.value() == ma_device_type_capture //
-                                    ? context.capture_infos()
-                                    : context.playback_infos();
-            return infos[dc_index.value()].name;
+            return maybe_infos.value()[dc_index.value()].name;
         }();
 
         if (ImGui::BeginCombo("capture source", preview_capture_source)) {
-            for (const auto& [index, capture_info] : ranges::views::enumerate(context.capture_infos())) {
-                if (ImGui::Selectable(capture_info.name)) {
-                    device_controls.index.set_if_ne(index);
+            maybe_infos.map([&](const auto& infos) {
+                for (const auto& [index, info] : ranges::views::enumerate(infos)) {
+                    if (ImGui::Selectable(info.name)) {
+                        device_controls.index.set_if_ne(index);
+                    }
                 }
-            }
+            });
             ImGui::EndCombo();
         }
     }

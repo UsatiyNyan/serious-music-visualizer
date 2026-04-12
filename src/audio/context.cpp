@@ -34,11 +34,18 @@ sl::meta::result<ma::device_uptr, ma_result> Context::create_device(
         device_config.playback.channels = playback_config.channels;
         device_config.playback.pDeviceID = &playback_infos_[playback_config.index].id;
     }
-    if (device_type & ma_device_type::ma_device_type_capture || device_type == ma_device_type_loopback) {
+    if (device_type & ma_device_type::ma_device_type_capture) {
         ASSERT(capture_config.index < capture_infos_.size());
         device_config.capture.format = format;
         device_config.capture.channels = capture_config.channels;
         device_config.capture.pDeviceID = &capture_infos_[capture_config.index].id;
+    }
+    if (device_type == ma_device_type_loopback) {
+        ASSERT(playback_config.index < playback_infos_.size());
+        device_config.capture.format = device_config.playback.format = format;
+        device_config.capture.channels = device_config.playback.channels = playback_config.channels;
+        device_config.capture.pDeviceID = device_config.playback.pDeviceID =
+	    &playback_infos_[playback_config.index].id;
     }
 
     device_config.sampleRate = data_config.sample_rate;

@@ -81,16 +81,16 @@ public:
     template <typename Callable>
     [[nodiscard]] sl::meta::result<ma::device_uptr, ma_result> create_loopback_device(
         const DataConfig& data_config,
-        const DeviceConfig& capture_config,
+        const DeviceConfig& playback_config,
         const std::unique_ptr<Callable>& callable
     ) const {
         constexpr auto data_callback =
             [](ma_device* device, [[maybe_unused]] void* output, const void* input, ma_uint32 frame_count) {
                 (*static_cast<Callable*>(device->pUserData)) //
-                    (std::span{ static_cast<const float*>(input), frame_count * device->capture.channels });
+                    (std::span{ static_cast<const float*>(input), frame_count * device->playback.channels });
             };
 
-        return create_device(ma_device_type_loopback, data_config, {}, capture_config, data_callback, callable.get());
+        return create_device(ma_device_type_loopback, data_config, playback_config, {}, data_callback, callable.get());
     }
 
 private:
