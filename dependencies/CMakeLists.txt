@@ -8,7 +8,7 @@ cpmaddpackage(
 cpmaddpackage(
         NAME serious-game-library
         GIT_REPOSITORY "https://github.com/UsatiyNyan/serious-game-library.git"
-        GIT_TAG 0.1.3
+        GIT_TAG 0.1.4
         GIT_SHALLOW TRUE
 )
 cpmaddpackage(
