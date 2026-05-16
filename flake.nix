@@ -31,6 +31,9 @@
         alsa-lib
         libpulseaudio
         pipewire
+
+        # build
+        just
       ];
       extraShellHook = ''
       '';
