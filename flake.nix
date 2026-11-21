@@ -1,42 +1,47 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
-    my-nixos.url = "github:UsatiyNyan/flake.nix";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-26.05";
+    l4y3r = {
+      url = "git+https://codeberg.org/us4tiyny4n/14y3r.git";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = {
     nixpkgs,
-    my-nixos,
+    l4y3r,
     ...
-  }: let
-    system = "x86_64-linux";
-    pkgs = nixpkgs.legacyPackages.${system};
-  in {
-    devShells.${system}.default = my-nixos.lib.mkComposedShell {
-      inherit system;
-      alias = "cyb3r14";
-      bases = ["nix" "cpp-clang"];
-      extraBuildInputs = with pkgs; [
-        extra-cmake-modules
+  }: {
+    devShells = l4y3r.lib.forAllSystems (system: let
+      pkgs = nixpkgs.legacyPackages.${system};
+    in {
+      default = l4y3r.lib.mkComposedShell {
+        inherit system;
+        alias = "cyb3r14";
+        bases = ["nix" "cpp-clang"];
+        extraBuildInputs = with pkgs; [
+          kdePackages.extra-cmake-modules
 
-        # graphics
-        wayland
-        wayland-scanner
-        wayland-protocols
-        libxkbcommon
-        libffi
-        libglvnd
+          # graphics
+          wayland
+          wayland-scanner
+          wayland-protocols
+          libxkbcommon
+          libffi
+          libglvnd
 
-        # audio
-        alsa-lib
-        libpulseaudio
-        pipewire
+          # audio
+          alsa-lib
+          libpulseaudio
+          pipewire
 
-        # build
-        just
-      ];
-      extraShellHook = ''
-      '';
-    };
+          # build
+          just
+          pkg-config
+        ];
+        extraShellHook = ''
+        '';
+      };
+    });
   };
 }
